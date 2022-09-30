@@ -1,22 +1,30 @@
 var { mat4 } = glMatrix;
 
 var InitApp = function() {
-    loadTextResource('/shader.vs.glsl', function(vsErr, vsText){
+    loadTextResource('/Shaders/shader.vs.glsl', function(vsErr, vsText){
         if (vsErr) {
             alert('Fatal Error getting vertex shader');
             console.log(vsErr);
         } else {
-            loadTextResource('/shader.fs.glsl', function(fsErr, fsText){  
+            loadTextResource('/Shaders/shader.fs.glsl', function(fsErr, fsText){  
                 if (fsErr) {
                     alert('Fatal Error getting fragment shader');
                     console.log(fsErr);
                 } else {
-                    loadJSONResource('/s', function(jsonErr, scene){
-                        if (jsonErr) {
-                            alert('Fatal Error getting scene.json');
-                            console.log(jsonErr);
+                    loadJSONResource('/Assets/tankP.json', (modelErr, modelObj) => {
+                        console.log(modelErr);
+                        if (modelErr) {
+                            alert('Fatal Error getting model.json');
+                            console.log(modelErr);
                         } else {
-                             RunApp(vsText, fsText);
+                            loadImageResource('/Assets/Tanks/textures/player/tank_blue.png', (imageErr, image) => {
+                                if (imageErr) {
+                                    alert('Fatal Error getting image');
+                                    console.log(imageErr);
+                                } else {
+                                    RunApp(vsText, fsText, modelObj, image);
+                                }
+                            });
                         }
                     });
                 }
@@ -25,7 +33,9 @@ var InitApp = function() {
     });
 };
 
-var RunApp = function(vertShaderText, fragShaderText, tankModel)  {
+var RunApp = function(vertShaderText, fragShaderText, tankModel, tankImage)  {
+
+    model = tankModel;
 
     var canvas = document.getElementById('game-surface');
 
@@ -45,7 +55,7 @@ var RunApp = function(vertShaderText, fragShaderText, tankModel)  {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.enable(gl.CULL_FACE);
-    gl.cullFace(gl.BACK);
+    gl.cullFace(gl.FRONT);
     gl.frontFace(gl.CCW);
 
     // Create Shaders
@@ -92,116 +102,59 @@ var RunApp = function(vertShaderText, fragShaderText, tankModel)  {
 
     // Create Buffer
 
-    var boxVertices = 
-    [
-        // X, Y, Z           U, V
-        // Top
-        -1.0, 1.0, -1.0,     0, 0,
-        -1.0, 1.0, 1.0,      0, 1,
-        1.0, 1.0, 1.0,       1, 1,
-        1.0, 1.0, -1.0,      1, 0,
+    var tankVertices = model.meshes[0].vertices;
+    var tankIndices = [].concat.apply([], model.meshes[0].faces);
+    var tankTexCoords = model.meshes[0].texturecoords[0];
 
-        // Left
-        -1.0, 1.0, 1.0,      1, 1,
-        -1.0, -1.0, 1.0,     0,1,
-        -1.0, -1.0, -1.0,    0, 0,
-        -1.0, 1.0, -1.0,     1, 0,
+    var tankVertexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, tankVertexBufferObject);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tankVertices), gl.STATIC_DRAW);
 
-        // Right
-        1.0, 1.0, 1.0,       1, 1,
-        1.0, -1.0, 1.0,      0, 1,
-        1.0, -1.0, -1.0,     0, 0,
-        1.0, 1.0, -1.0,      1, 0,
+    var tankIndexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tankIndexBufferObject);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(tankIndices), gl.STATIC_DRAW);
 
-        // Front
-        1.0, 1.0, 1.0,       1, 1,
-        1.0, -1.0, 1.0,      1, 0,
-        -1.0, -1.0, 1.0,     0, 0,
-        -1.0, 1.0, 1.0,      0, 1,
+    var tankTexCoordBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, tankTexCoordBufferObject);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tankTexCoords), gl.STATIC_DRAW);
 
-        // Back
-        1.0, 1.0, -1.0,      1, 1,
-        1.0, -1.0, -1.0,     1, 0,
-        -1.0, -1.0, -1.0,    0, 0,
-        -1.0, 1.0, -1.0,     0, 1,
 
-        // Bottom
-        -1.0, -1.0, -1.0,    0, 0,
-        -1.0, -1.0, 1.0,     0, 1,
-        1.0, -1.0, 1.0,      1, 1,
-        1.0, -1.0, -1.0,     1, 0,
-
-    ];
-
-    var boxIndices =
-    [
-        // Top
-        0, 1, 2,
-        0, 2, 3,
-
-        // Left
-        5, 4, 6,
-        6, 4, 7,
-
-        // Right
-        8, 9, 10,
-        8, 10, 11,
-
-        // Front
-        13, 12, 14,
-        15, 14, 12,
-
-        // Back
-        16, 17, 18,
-        16, 18, 19,
-
-        // Bottom
-        21, 20, 22,
-        22, 20, 23
-    ];
-
-    var boxVertexBufferObject = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, boxVertexBufferObject);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxVertices), gl.STATIC_DRAW);
-
-    var indexBufferObject = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBufferObject);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(boxIndices), gl.STATIC_DRAW);
-
-    var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition')
-    var texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
-
+    gl.bindBuffer(gl.ARRAY_BUFFER, tankVertexBufferObject);
+    var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
     gl.vertexAttribPointer(
         positionAttribLocation,
         3,
         gl.FLOAT,
         false,
-        5 * Float32Array.BYTES_PER_ELEMENT,
+        3 * Float32Array.BYTES_PER_ELEMENT,
         0
     );
+    gl.enableVertexAttribArray(positionAttribLocation);
 
+    gl.bindBuffer(gl.ARRAY_BUFFER, tankTexCoordBufferObject);
+    var texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
     gl.vertexAttribPointer(
         texCoordAttribLocation,
         2,
         gl.FLOAT,
         false,
-        5 * Float32Array.BYTES_PER_ELEMENT,
-        3 * Float32Array.BYTES_PER_ELEMENT
-    )
-
-    gl.enableVertexAttribArray(positionAttribLocation);
+        2  * Float32Array.BYTES_PER_ELEMENT,
+        0,
+    );
     gl.enableVertexAttribArray(texCoordAttribLocation);
+    
+    
 
     //  Create Texture
 
-    var boxTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, boxTexture);
+    var tankTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tankTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, document.getElementById('amongus'));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tankImage);
 
     gl.bindTexture(gl.TEXTURE_2D, null);
 
@@ -229,6 +182,7 @@ var RunApp = function(vertShaderText, fragShaderText, tankModel)  {
 
     var xRotationMat = new Float32Array(16);
     var yRotationMat = new Float32Array(16);
+    var scaleMat = new Float32Array(16);
 
     var identityMatrix = new Float32Array(16);
     mat4.identity(identityMatrix);
@@ -240,16 +194,19 @@ var RunApp = function(vertShaderText, fragShaderText, tankModel)  {
         theta = performance.now() / 1000 / 6 * 2 * Math.PI;
         mat4.rotate(xRotationMat, identityMatrix, theta, [1, 0, 0]);
         mat4.rotate(yRotationMat, identityMatrix, theta / 4, [0, 1, 0]);
+        mat4.scale(scaleMat, identityMatrix, [0.1,0.1,0.1]);
         mat4.mul(worldMatrix, xRotationMat, yRotationMat);
+        mat4.mul(worldMatrix, worldMatrix, scaleMat);
+
         gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
 
         gl.clearColor(0.75, 0.85, 0.8, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        gl.bindTexture(gl.TEXTURE_2D, boxTexture);
+        gl.bindTexture(gl.TEXTURE_2D, tankTexture);
         gl.activeTexture(gl.TEXTURE0);
 
-        gl.drawElements(gl.TRIANGLES, boxIndices.length, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, tankIndices.length, gl.UNSIGNED_SHORT, 0);
         requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
