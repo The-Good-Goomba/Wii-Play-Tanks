@@ -4,8 +4,6 @@ It is a remake of the hit game Wii Play's minigame wii tanks
 
 To get started just open the HTML5 file
 
-If you want to help, would recommend install live-server with npm
+If you want to help, would recommend install live server extension on vscode
 
-"npm i -g live-server"
-
-then type the command live-server to begin
+Very easy, has live updates
