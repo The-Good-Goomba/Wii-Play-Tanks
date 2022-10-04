@@ -8,7 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var { mat4 } = glMatrix;
+const { mat4, vec3, quat } = glMatrix;
 var InitApp = function () {
     (() => __awaiter(this, void 0, void 0, function* () {
         var vertShaderText = yield loadTextResource('/src/Shaders/shader.vs.glsl');
@@ -135,3 +135,32 @@ var RunApp = function (vertShaderText, fragShaderText, tankModel, tankImage) {
     };
     requestAnimationFrame(loop);
 };
+// Load a text resource from a file over the network
+function loadTextResource(url) {
+    return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+        var request = yield fetch(url);
+        if (request.status < 200 || request.status > 299) {
+            reject('Error: HTTP Status ' + request.status + ' on resource ' + url);
+        }
+        else {
+            resolve(request.text());
+        }
+    }));
+}
+// Load a JSON resource from a file over the network
+function loadJSONResource(url) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var json = yield loadTextResource(url);
+        return JSON.parse(json);
+    });
+}
+// Load an image resource from a file over the network
+function loadImageResource(url) {
+    return new Promise((resolve) => {
+        var image = new Image();
+        image.onload = function () {
+            resolve(image);
+        };
+        image.src = url;
+    });
+}

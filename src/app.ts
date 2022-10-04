@@ -1,5 +1,7 @@
+
 declare var glMatrix: any;
-var { mat4 } = glMatrix;
+const { mat4 , vec3, quat } = glMatrix;
+
 
 var InitApp = function() {
     (async () => {
