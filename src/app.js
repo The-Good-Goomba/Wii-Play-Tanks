@@ -2,16 +2,16 @@ var { mat4 } = glMatrix;
 
 var InitApp = function() {
     (async () => {
-        var vertShaderText = await loadTextResource('../Shaders/shader.vs.glsl');
-        var fragShaderText = await loadTextResource('../Shaders/shader.fs.glsl');
-        var tankModel = await loadJSONResource('/Assets/tankP.json');
-        var tankImage = await loadImageResource('/Assets/Tanks/textures/player/tank_blue.png');
-
+        var vertShaderText = await loadTextResource('/src/Shaders/shader.vs.glsl');
+        var fragShaderText = await loadTextResource('/src/Shaders/shader.fs.glsl');
+        var tankModel = await loadJSONResource('/src/Assets/tankP.json');
+        var tankImage = await loadImageResource('/src/Assets/Tanks/textures/player/tank_blue.png');
         RunApp(vertShaderText, fragShaderText, tankModel, tankImage);
-    });
+    })();
 };
 
 var RunApp = function(vertShaderText, fragShaderText, tankModel, tankImage)  {
+    console.log(vertShaderText);
 
     model = tankModel;
 
@@ -31,9 +31,10 @@ var RunApp = function(vertShaderText, fragShaderText, tankModel, tankImage)  {
 
     gl.clearColor(0.75, 0.85, 0.8, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST)
 
     gl.enable(gl.CULL_FACE);
-    gl.cullFace(gl.FRONT);
+    gl.cullFace(gl.BACK);
     gl.frontFace(gl.CCW);
 
     // Create Shaders

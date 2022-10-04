@@ -1,7 +1,7 @@
 // Load a text resource from a file over the network
 
-async function loadTextResource(url) {
-    return new Promise<string>(async (resolve, reject) => {
+function loadTextResource(url) {
+    return new Promise(async (resolve, reject) => {
         var request = await fetch(url);
         if (request.status < 200 || request.status > 299) {
             reject('Error: HTTP Status ' + request.status + ' on resource ' + url);
@@ -19,7 +19,7 @@ async function loadJSONResource(url) {
 
 // Load an image resource from a file over the network
 function loadImageResource(url) {
-    return new Promise<TexImageSource>((resolve) => {
+    return new Promise((resolve) => {
         var image = new Image();
         image.onload = function() {
             resolve(image);
