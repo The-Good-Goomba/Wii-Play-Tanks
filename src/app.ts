@@ -1,3 +1,4 @@
+declare var glMatrix: any;
 var { mat4 } = glMatrix;
 
 var InitApp = function() {
@@ -10,19 +11,17 @@ var InitApp = function() {
     })();
 };
 
-var RunApp = function(vertShaderText, fragShaderText, tankModel, tankImage)  {
-    console.log(vertShaderText);
+var RunApp = function(vertShaderText: string, fragShaderText: string, tankModel: any, tankImage: TexImageSource)  {
 
-    model = tankModel;
+    var model = tankModel;
 
-    var canvas = document.getElementById('game-surface');
+    var canvas = document.getElementById('game-surface') as HTMLCanvasElement;
 
-    /** @type {WebGLRenderingContext} */
-    var gl = canvas.getContext('webgl');
+    var gl = canvas.getContext('webgl') as WebGL2RenderingContext;
 
     if (!gl) {
         console.log('WebGL not supported, falling back on experimental-webgl');
-        gl = canvas.getContext('experimental-webgl');
+        gl = canvas.getContext('experimental-webgl') as WebGL2RenderingContext;
     }
 
     if (!gl) {
@@ -42,7 +41,7 @@ var RunApp = function(vertShaderText, fragShaderText, tankModel, tankImage)  {
     // Vertex Shader
     var source = vertShaderText;
 
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    const vertexShader = gl.createShader(gl.VERTEX_SHADER)!;
     gl.shaderSource(vertexShader, source);
     gl.compileShader(vertexShader);
 
@@ -54,7 +53,7 @@ var RunApp = function(vertShaderText, fragShaderText, tankModel, tankImage)  {
     // Fragment Shader
     source = fragShaderText;
 
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER)!;
     gl.shaderSource(fragmentShader, source);
     gl.compileShader(fragmentShader);
 
@@ -63,7 +62,7 @@ var RunApp = function(vertShaderText, fragShaderText, tankModel, tankImage)  {
         return;
     }
 
-    var program = gl.createProgram();
+    var program = gl.createProgram()!;
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
