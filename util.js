@@ -1,38 +1,30 @@
-
 // Load a text resource from a file over the network
-function loadTextResource(url, callback) {
-    var request = new XMLHttpRequest();
-    request.open('GET', url + '?please-dont-cache=' + Math.random(), true);
-    request.onload = function() {
-        if (request.status < 200 || request.status > 299) {
-            callback('Error: HTTP Status ' + request.status + ' on resource ' + url);
-        } else {
-            callback(null, request.responseText);
-        }
-    };
-    request.send();
-}
 
-// Load a JSON resource from a file over the network
-function loadJSONResource(url, callback) {
-    loadTextResource(url, function(err, result) {
-        if (err) {
-            callback(err);
+async function loadTextResource(url) {
+    return new Promise<string>(async (resolve, reject) => {
+        var request = await fetch(url);
+        if (request.status < 200 || request.status > 299) {
+            reject('Error: HTTP Status ' + request.status + ' on resource ' + url);
         } else {
-            try {
-                callback(null, JSON.parse(result));
-            } catch(e) {
-                callback(e);
-            }
+            resolve(request.text());
         }
     });
 }
 
+// Load a JSON resource from a file over the network
+async function loadJSONResource(url) {
+    var json = await loadTextResource(url);
+    return JSON.parse(json);
+}
+
 // Load an image resource from a file over the network
-function loadImageResource(url, callback) {
-    var image = new Image();
-    image.onload = function() {
-        callback(null, image);
-    };
-    image.src = url;
+function loadImageResource(url) {
+    return new Promise<TexImageSource>((resolve) => {
+        var image = new Image();
+        image.onload = function() {
+            resolve(image);
+        };
+        image.src = url;
+    });
+    
 }

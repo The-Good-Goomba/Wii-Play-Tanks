@@ -1,35 +1,13 @@
 var { mat4 } = glMatrix;
 
 var InitApp = function() {
-    loadTextResource('/Shaders/shader.vs.glsl', function(vsErr, vsText){
-        if (vsErr) {
-            alert('Fatal Error getting vertex shader');
-            console.log(vsErr);
-        } else {
-            loadTextResource('/Shaders/shader.fs.glsl', function(fsErr, fsText){  
-                if (fsErr) {
-                    alert('Fatal Error getting fragment shader');
-                    console.log(fsErr);
-                } else {
-                    loadJSONResource('/Assets/tankP.json', (modelErr, modelObj) => {
-                        console.log(modelErr);
-                        if (modelErr) {
-                            alert('Fatal Error getting model.json');
-                            console.log(modelErr);
-                        } else {
-                            loadImageResource('/Assets/Tanks/textures/player/tank_blue.png', (imageErr, image) => {
-                                if (imageErr) {
-                                    alert('Fatal Error getting image');
-                                    console.log(imageErr);
-                                } else {
-                                    RunApp(vsText, fsText, modelObj, image);
-                                }
-                            });
-                        }
-                    });
-                }
-            });
-        }
+    (async () => {
+        var vertShaderText = await loadTextResource('../Shaders/shader.vs.glsl');
+        var fragShaderText = await loadTextResource('../Shaders/shader.fs.glsl');
+        var tankModel = await loadJSONResource('/Assets/tankP.json');
+        var tankImage = await loadImageResource('/Assets/Tanks/textures/player/tank_blue.png');
+
+        RunApp(vertShaderText, fragShaderText, tankModel, tankImage);
     });
 };
 
