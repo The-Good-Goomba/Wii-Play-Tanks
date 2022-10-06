@@ -2,8 +2,9 @@ precision mediump float;
 
 attribute vec3 vertPosition;
 attribute vec2 vertTexCoord;
+attribute vec3 vertNormal;
 
-varying vec2 fragTexCoord;
+varying mediump vec2 fragTexCoord;
 
 uniform mat4 mWorld;
 uniform mat4 mView;

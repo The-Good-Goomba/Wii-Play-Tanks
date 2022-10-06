@@ -15,108 +15,77 @@ var start = function () {
 };
 class Main {
     static InitApp() {
+        var canvas = document.getElementById('game-surface');
+        Main.gl = canvas.getContext('webgl');
+        if (!Main.gl) {
+            console.log('WebGL not supported, falling back on experimental-webgl');
+            Main.gl = canvas.getContext('experimental-webgl');
+        }
+        if (!Main.gl) {
+            alert('Your browser does not support WebGL');
+        }
+        Main.gl.clearColor(0.75, 0.85, 0.8, 1.0);
+        Main.gl.clear(Main.gl.COLOR_BUFFER_BIT | Main.gl.DEPTH_BUFFER_BIT);
+        Main.gl.enable(Main.gl.DEPTH_TEST);
+        Main.gl.enable(Main.gl.CULL_FACE);
+        Main.gl.cullFace(Main.gl.BACK);
+        Main.gl.frontFace(Main.gl.CCW);
         (() => __awaiter(this, void 0, void 0, function* () {
-            var vertShaderText = yield loadTextResource('/src/Shaders/shader.vs.glsl');
-            var fragShaderText = yield loadTextResource('/src/Shaders/shader.fs.glsl');
-            var tankModel = yield loadJSONResource('/src/Assets/tankP.json');
-            var tankImage = yield loadImageResource('/src/Assets/Tanks/textures/player/tank_blue.png');
-            this.RunApp(vertShaderText, fragShaderText, tankModel, tankImage);
+            yield Engine.Initialise(Main.gl);
+            this.RunApp(Main.gl, canvas);
         }))();
     }
     ;
-    static RunApp(vertShaderText, fragShaderText, tankModel, tankImage) {
-        var model = tankModel;
-        var canvas = document.getElementById('game-surface');
-        var gl = canvas.getContext('webgl');
-        if (!gl) {
-            console.log('WebGL not supported, falling back on experimental-webgl');
-            gl = canvas.getContext('experimental-webgl');
-        }
-        if (!gl) {
-            alert('Your browser does not support WebGL');
-        }
-        gl.clearColor(0.75, 0.85, 0.8, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.enable(gl.DEPTH_TEST);
-        gl.enable(gl.CULL_FACE);
-        gl.cullFace(gl.BACK);
-        gl.frontFace(gl.CCW);
-        // Create Shaders
-        // Vertex Shader
-        var source = vertShaderText;
-        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-        gl.shaderSource(vertexShader, source);
-        gl.compileShader(vertexShader);
-        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-            console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(vertexShader));
+    static RunApp(gl, canvas) {
+        var program = Main.gl.createProgram();
+        Main.gl.attachShader(program, Engine.shaderLibrary.getFragment(0 /* defaultFrag */));
+        Main.gl.attachShader(program, Engine.shaderLibrary.getVertex(0 /* defaultVert */));
+        Main.gl.linkProgram(program);
+        if (!Main.gl.getProgramParameter(program, Main.gl.LINK_STATUS)) {
+            console.error('ERROR linking program!', Main.gl.getProgramInfoLog(program));
             return;
         }
-        // Fragment Shader
-        source = fragShaderText;
-        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(fragmentShader, source);
-        gl.compileShader(fragmentShader);
-        if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-            console.error('ERROR compiling fragment shader!', gl.getShaderInfoLog(fragmentShader));
-            return;
-        }
-        var program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            console.error('ERROR linking program!', gl.getProgramInfoLog(program));
-            return;
-        }
-        gl.validateProgram(program);
-        if (!gl.getProgramParameter(program, gl.VALIDATE_STATUS)) {
-            console.error('ERROR validating program!', gl.getProgramInfoLog(program));
+        Main.gl.validateProgram(program);
+        if (!Main.gl.getProgramParameter(program, Main.gl.VALIDATE_STATUS)) {
+            console.error('ERROR validating program!', Main.gl.getProgramInfoLog(program));
             return;
         }
         // Create Buffer
-        var tankVertices = model.meshes[0].vertices;
-        var tankIndices = [].concat.apply([], model.meshes[0].faces);
-        var tankTexCoords = model.meshes[0].texturecoords[0];
-        var tankVertexBufferObject = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, tankVertexBufferObject);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tankVertices), gl.STATIC_DRAW);
-        var tankIndexBufferObject = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tankIndexBufferObject);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(tankIndices), gl.STATIC_DRAW);
-        var tankTexCoordBufferObject = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, tankTexCoordBufferObject);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tankTexCoords), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, tankVertexBufferObject);
-        var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
-        gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
-        gl.enableVertexAttribArray(positionAttribLocation);
-        gl.bindBuffer(gl.ARRAY_BUFFER, tankTexCoordBufferObject);
-        var texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
-        gl.vertexAttribPointer(texCoordAttribLocation, 2, gl.FLOAT, false, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
-        gl.enableVertexAttribArray(texCoordAttribLocation);
+        var tankBufferObject = Main.gl.createBuffer();
+        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, tankBufferObject);
+        Main.gl.bufferData(Main.gl.ARRAY_BUFFER, Engine.modelLibrary.get(0 /* tank */).model, Main.gl.STATIC_DRAW);
+        var positionAttribLocation = Main.gl.getAttribLocation(program, 'vertPosition');
+        var texCoordAttribLocation = Main.gl.getAttribLocation(program, 'vertTexCoord');
+        var normalAttribLocation = Main.gl.getAttribLocation(program, 'vertNormal');
+        Main.gl.vertexAttribPointer(positionAttribLocation, 3, Main.gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+        Main.gl.vertexAttribPointer(texCoordAttribLocation, 2, Main.gl.FLOAT, false, 2 * Float32Array.BYTES_PER_ELEMENT, 12);
+        Main.gl.vertexAttribPointer(normalAttribLocation, 3, Main.gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 24);
+        Main.gl.enableVertexAttribArray(positionAttribLocation);
+        Main.gl.enableVertexAttribArray(texCoordAttribLocation);
+        Main.gl.enableVertexAttribArray(normalAttribLocation);
         //  Create Texture
-        var tankTexture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, tankTexture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tankImage);
-        gl.bindTexture(gl.TEXTURE_2D, null);
+        var tankTexture = Main.gl.createTexture();
+        Main.gl.bindTexture(Main.gl.TEXTURE_2D, tankTexture);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.CLAMP_TO_EDGE);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.CLAMP_TO_EDGE);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
+        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.get(0 /* blueTank */));
+        Main.gl.bindTexture(Main.gl.TEXTURE_2D, null);
         // What program we are using
-        gl.useProgram(program);
-        var matWorldUniformLocation = gl.getUniformLocation(program, 'mWorld');
-        var matViewUniformLocation = gl.getUniformLocation(program, 'mView');
-        var matProjUniformLocation = gl.getUniformLocation(program, 'mProj');
+        Main.gl.useProgram(program);
+        var matWorldUniformLocation = Main.gl.getUniformLocation(program, 'mWorld');
+        var matViewUniformLocation = Main.gl.getUniformLocation(program, 'mView');
+        var matProjUniformLocation = Main.gl.getUniformLocation(program, 'mProj');
         var worldMatrix = new Float32Array(16);
         var projMatrix = new Float32Array(16);
         var viewMatrix = new Float32Array(16);
         mat4.identity(worldMatrix);
         mat4.lookAt(viewMatrix, [0, 0, -7], [0, 0, 0], [0, 1, 0]);
         mat4.perspective(projMatrix, Math.PI / 4.0, canvas.width / canvas.height, 0.1, 1000.0);
-        gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
-        gl.uniformMatrix4fv(matViewUniformLocation, false, viewMatrix);
-        gl.uniformMatrix4fv(matProjUniformLocation, false, projMatrix);
+        Main.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
+        Main.gl.uniformMatrix4fv(matViewUniformLocation, false, viewMatrix);
+        Main.gl.uniformMatrix4fv(matProjUniformLocation, false, projMatrix);
         // Main Render Loop
         var xRotationMat = new Float32Array(16);
         var yRotationMat = new Float32Array(16);
@@ -124,6 +93,7 @@ class Main {
         var identityMatrix = new Float32Array(16);
         mat4.identity(identityMatrix);
         var theta = 0;
+        console.log(Engine.modelLibrary.get(0 /* tank */).faceCount);
         var loop = () => {
             theta = performance.now() / 1000 / 6 * 2 * Math.PI;
             mat4.rotate(xRotationMat, identityMatrix, theta, [1, 0, 0]);
@@ -131,12 +101,12 @@ class Main {
             mat4.scale(scaleMat, identityMatrix, [0.1, 0.1, 0.1]);
             mat4.mul(worldMatrix, xRotationMat, yRotationMat);
             mat4.mul(worldMatrix, worldMatrix, scaleMat);
-            gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
-            gl.clearColor(0.75, 0.85, 0.8, 1.0);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            gl.bindTexture(gl.TEXTURE_2D, tankTexture);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.drawElements(gl.TRIANGLES, tankIndices.length, gl.UNSIGNED_SHORT, 0);
+            Main.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
+            Main.gl.clearColor(0.75, 0.85, 0.8, 1.0);
+            Main.gl.clear(Main.gl.COLOR_BUFFER_BIT | Main.gl.DEPTH_BUFFER_BIT);
+            Main.gl.bindTexture(Main.gl.TEXTURE_2D, tankTexture);
+            Main.gl.activeTexture(Main.gl.TEXTURE0);
+            Main.gl.drawElements(Main.gl.TRIANGLES, Engine.modelLibrary.get(0 /* tank */).faceCount, Main.gl.UNSIGNED_SHORT, 0);
             requestAnimationFrame(loop);
         };
         requestAnimationFrame(loop);
@@ -145,9 +115,19 @@ class Main {
 class Engine {
     static get modelLibrary() { return this._modelLibrary; }
     static get textureLibrary() { return this._textureLibrary; }
-    static Initialise() {
-        this._textureLibrary = new TextureLibrary();
-        this._modelLibrary = new ModelLibrary();
+    static get shaderLibrary() { return this._shaderLibrary; }
+    static Initialise(gl) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                Engine._textureLibrary = new TextureLibrary();
+                yield Engine._textureLibrary.Initialise();
+                Engine._modelLibrary = new ModelLibrary();
+                yield Engine._modelLibrary.Initialise();
+                Engine._shaderLibrary = new ShaderLibrary();
+                yield Engine._shaderLibrary.Initialise(Main.gl);
+                resolve();
+            }));
+        });
     }
 }
 class Apex {
@@ -269,18 +249,22 @@ class GameObject extends Apex {
 class ModelLibrary {
     constructor() {
         this.library = [];
-        (() => __awaiter(this, void 0, void 0, function* () {
+    }
+    Initialise() {
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             this.library[0 /* tank */] = yield Model.getBinaryFromObj("/src/Assets/tankP.obj");
-        }))();
+            resolve();
+        }));
     }
     get(type) {
         return this.library[type];
     }
 }
 class Mesh {
-    constructor(model, bounds) {
+    constructor(model, bounds, count) {
         this.model = model;
         this.boundingBox = bounds;
+        this.faceCount = count;
     }
 }
 class Model {
@@ -310,6 +294,7 @@ Model.parseFile = (fileContents) => {
     const texCoords = [];
     const normals = [];
     const arrayBufferSource = [];
+    var faceCount = 0;
     var boundingBox = new BoundingBox([Infinity, Infinity, Infinity], [-Infinity, -Infinity, -Infinity]);
     const lines = fileContents.split('\n');
     var pos = [0, 0, 0];
@@ -327,6 +312,7 @@ Model.parseFile = (fileContents) => {
             normals.push(_a.stringsToNumbers(values));
         }
         else if (command === 'f') {
+            faceCount += 1;
             for (const group of values) {
                 const [positionIndex, texCoordIndex, normalIndex] = _a.stringsToNumbers(group.split('/'));
                 arrayBufferSource.push(...positions[positionIndex - 1]);
@@ -335,57 +321,100 @@ Model.parseFile = (fileContents) => {
             }
         }
     }
-    return new Mesh(new Float32Array(arrayBufferSource).buffer, boundingBox);
+    return new Mesh(new Float32Array(arrayBufferSource).buffer, boundingBox, faceCount);
 };
 class TextureLibrary {
     constructor() {
         this.library = [];
-        (() => __awaiter(this, void 0, void 0, function* () {
-            this.library[0 /* blueTank */] = yield loadImageResource("/src/Assets/Tanks/textures/player/tank_blue.png");
-            this.library[1 /* redTank */] = yield loadImageResource("/src/Assets/Tanks/textures/player/tank_red.png");
-            this.library[2 /* ashTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_ash.png");
-            this.library[3 /* blackTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_black.png");
-            this.library[4 /* brownTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_brown.png");
-            this.library[5 /* greenTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_green.png");
-            this.library[6 /* marinTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_marin.png");
-            this.library[7 /* pinkTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_pink.png");
-            this.library[8 /* purpleTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_purple.png");
-            this.library[9 /* violetTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_violet.png");
-            this.library[10 /* whiteTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_white.png");
-            this.library[11 /* yellowTank */] = yield loadImageResource("/src/Assets/Tanks/textures/enemy/tank_yellow.png");
-        }))();
+    }
+    Initialise() {
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            this.library[0 /* blueTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/player/tank_blue.png");
+            this.library[1 /* redTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/player/tank_red.png");
+            this.library[2 /* ashTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_ash.png");
+            this.library[3 /* blackTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_black.png");
+            this.library[4 /* brownTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_brown.png");
+            this.library[5 /* greenTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_green.png");
+            this.library[6 /* marinTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_marin.png");
+            this.library[7 /* pinkTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_pink.png");
+            this.library[8 /* purpleTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_purple.png");
+            this.library[9 /* violetTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_violet.png");
+            this.library[10 /* whiteTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_white.png");
+            this.library[11 /* yellowTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_yellow.png");
+            resolve();
+        }));
     }
     get(type) {
         return this.library[type];
     }
 }
-function loadTextResource(url) {
-    return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-        var request = yield fetch(url);
-        if (request.status < 200 || request.status > 299) {
-            reject('Error: HTTP Status ' + request.status + ' on resource ' + url);
-        }
-        else {
-            resolve(request.text());
-        }
-    }));
+class ShaderLibrary {
+    constructor() {
+        this.vertexLibrary = new Array(1);
+        this.fragmentLibrary = new Array(1);
+    }
+    getVertex(type) {
+        return this.vertexLibrary[type];
+    }
+    getFragment(type) {
+        return this.fragmentLibrary[type];
+    }
+    Initialise(gl) {
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            var stringLib = new Array(1);
+            stringLib[0 /* defaultVert */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.vs.glsl');
+            for (let i = 0; i < stringLib.length; i++) {
+                console.log(stringLib[i]);
+                this.vertexLibrary[i] = gl.createShader(gl.VERTEX_SHADER);
+                gl.shaderSource(this.vertexLibrary[i], stringLib[i]);
+                gl.compileShader(this.vertexLibrary[i]);
+                if (Main.gl.getShaderParameter(this.vertexLibrary[i], gl.COMPILE_STATUS)) {
+                    console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(this.vertexLibrary[i]));
+                }
+            }
+            stringLib = new Array(1);
+            stringLib[0 /* defaultFrag */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.fs.glsl');
+            for (let i = 0; i < stringLib.length; i++) {
+                this.fragmentLibrary[i] = gl.createShader(gl.FRAGMENT_SHADER);
+                gl.shaderSource(this.fragmentLibrary[i], stringLib[i]);
+                gl.compileShader(this.fragmentLibrary[i]);
+                if (gl.getShaderParameter(this.fragmentLibrary[i], gl.COMPILE_STATUS)) {
+                    console.error('ERROR compiling fragment shader!', gl.getShaderInfoLog(this.fragmentLibrary[i]));
+                }
+            }
+            resolve();
+        }));
+    }
 }
-// Load a JSON resource from a file over the network
-function loadJSONResource(url) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var json = yield loadTextResource(url);
-        return JSON.parse(json);
-    });
-}
-// Load an image resource from a file over the network
-function loadImageResource(url) {
-    return new Promise((resolve) => {
-        var image = new Image();
-        image.onload = function () {
-            resolve(image);
-        };
-        image.src = url;
-    });
+class ResourceLoader {
+    static loadTextResource(url) {
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            var request = yield fetch(url);
+            if (request.status < 200 || request.status > 299) {
+                reject('Error: HTTP Status ' + request.status + ' on resource ' + url);
+            }
+            else {
+                resolve(request.text());
+            }
+        }));
+    }
+    // Load a JSON resource from a file over the network
+    static loadJSONResource(url) {
+        return __awaiter(this, void 0, void 0, function* () {
+            var json = yield this.loadTextResource(url);
+            return JSON.parse(json);
+        });
+    }
+    // Load an image resource from a file over the network
+    static loadImageResource(url) {
+        return new Promise((resolve) => {
+            var image = new Image();
+            image.onload = function () {
+                resolve(image);
+            };
+            image.src = url;
+        });
+    }
 }
 class BoundingBox {
     constructor(min = [0, 0, 0], max = [0, 0, 0]) {
