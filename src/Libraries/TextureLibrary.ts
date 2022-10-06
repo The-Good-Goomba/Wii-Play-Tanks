@@ -1,5 +1,7 @@
 export enum TextureTypes
 {
+    none = -1,
+
     blueTank,
     redTank,
     ashTank,

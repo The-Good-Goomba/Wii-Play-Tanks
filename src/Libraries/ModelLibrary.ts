@@ -1,11 +1,13 @@
-enum ModelTypes
+import { BoundingBox } from "../Utility/boundingBox";
+
+export const enum ModelTypes
 {
     tank
 }
 
 export class ModelLibrary
 {
-    private library: ArrayBuffer[] = [];
+    private library: Mesh[] = [];
 
     constructor()
     {
@@ -14,11 +16,21 @@ export class ModelLibrary
         })();
     }
 
-    public get(type: ModelTypes): ArrayBuffer
+    public get(type: ModelTypes): Mesh
     {
         return this.library[type]
     }
 
+}
+
+export class Mesh
+{
+    model!: ArrayBuffer;
+    boundingBox!: BoundingBox;
+    constructor(model: ArrayBuffer, bounds: BoundingBox) {
+        this.model = model
+        this.boundingBox = bounds
+    }
 }
 
 class Model
@@ -26,8 +38,8 @@ class Model
     static async getBinaryFromObj(url: string)
     {
         const fileContents = await this.getFileContents(url);
-        const arrayBuffer = this.parseFile(fileContents);
-        return arrayBuffer;
+        const mesh = this.parseFile(fileContents);
+        return mesh;
     }
 
     private static getFileContents = async (filename: string) =>
@@ -55,13 +67,21 @@ class Model
 
         const arrayBufferSource = [];
 
+        var boundingBox = new BoundingBox (
+            [Infinity, Infinity, Infinity],
+            [-Infinity, -Infinity, -Infinity]
+        )
+
         const lines = fileContents.split('\n');
+        var pos: [number, number, number] = [0,0,0];
         for(const line of lines)
         {
             const [ command, ...values] = line.split(' ', 4);
         
             if (command === 'v')
             {
+                pos = this.stringsToNumbers(values) as [number, number, number];
+                boundingBox.updateBounds(pos);
                 positions.push(this.stringsToNumbers(values));
             }
             else if (command === 'vt')
@@ -87,11 +107,8 @@ class Model
 
         }
 
-        console.log(arrayBufferSource);
-        return new Float32Array(arrayBufferSource).buffer;
+        return new Mesh(new Float32Array(arrayBufferSource).buffer, boundingBox);
     }   
-
-    
 
 }
 

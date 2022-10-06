@@ -1,4 +1,3 @@
-
 declare var glMatrix: any;
 const { mat4 , vec3, quat } = glMatrix;
 
