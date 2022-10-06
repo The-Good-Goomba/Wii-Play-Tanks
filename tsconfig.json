@@ -2,7 +2,8 @@
   "compilerOptions": {
     "target": "ES6",
     "rootDir": "src",
-    "outFile": "dist/dist.js",
-    "strict": true
+    "outDir": "dist",
+    "strict": true,
+    "watch": true
   },
 }
