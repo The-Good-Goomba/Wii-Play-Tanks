@@ -1,12 +1,13 @@
 #version 300 es
 precision mediump float;
 
-in vec3 vertPosition;
-in vec2 vertTexCoord;
-in vec3 vertNormal;
+layout(location=0) in vec3 vertPosition;
+layout(location=1) in vec3 vertNormal;
+layout(location=2) in vec2 vertTexCoord;
 
-out vec2 fragTexCoord;
-out vec3 fragNormal;
+
+flat out vec2 fragTexCoord;
+flat out vec3 fragNormal;
 
 uniform mat4 mWorld;
 uniform mat4 mView;

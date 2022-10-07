@@ -57,12 +57,12 @@ class Main {
         var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
         var texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
         var normalAttribLocation = gl.getAttribLocation(program, 'vertNormal');
-        gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
-        gl.vertexAttribPointer(texCoordAttribLocation, 2, gl.FLOAT, false, 2 * Float32Array.BYTES_PER_ELEMENT, 12);
-        gl.vertexAttribPointer(normalAttribLocation, 3, gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 24);
+        gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
+        gl.vertexAttribPointer(normalAttribLocation, 3, gl.FLOAT, false, 32, 12);
+        gl.vertexAttribPointer(texCoordAttribLocation, 2, gl.FLOAT, false, 32, 24);
         gl.enableVertexAttribArray(positionAttribLocation);
-        gl.enableVertexAttribArray(texCoordAttribLocation);
         gl.enableVertexAttribArray(normalAttribLocation);
+        gl.enableVertexAttribArray(texCoordAttribLocation);
         //  Create Texture
         var tankTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, tankTexture);
@@ -70,7 +70,7 @@ class Main {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, Engine.textureLibrary.get(0 /* blueTank */));
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, Engine.textureLibrary.get(6 /* marinTank */));
         gl.bindTexture(gl.TEXTURE_2D, null);
         // What program we are using
         gl.useProgram(program);
@@ -90,14 +90,14 @@ class Main {
         var xRotationMat = new Float32Array(16);
         var yRotationMat = new Float32Array(16);
         var scaleMat = new Float32Array(16);
-        var identityMatrix = new Float32Array(16);
-        mat4.identity(identityMatrix);
+        var identityMatrix = mat4.create();
         var theta = 0;
+        console.log(Engine.modelLibrary.get(0 /* tank */).model.byteLength / 32);
         var loop = () => {
             theta = performance.now() / 1000 / 6 * 2 * Math.PI;
             mat4.rotate(xRotationMat, identityMatrix, theta, [1, 0, 0]);
             mat4.rotate(yRotationMat, identityMatrix, theta / 4, [0, 1, 0]);
-            mat4.scale(scaleMat, identityMatrix, [1, 1, 1]);
+            mat4.scale(scaleMat, identityMatrix, [10, 10, 10]);
             mat4.mul(worldMatrix, xRotationMat, yRotationMat);
             mat4.mul(worldMatrix, worldMatrix, scaleMat);
             gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
@@ -105,7 +105,7 @@ class Main {
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             gl.bindTexture(gl.TEXTURE_2D, tankTexture);
             gl.activeTexture(gl.TEXTURE0);
-            gl.drawArrays(gl.TRIANGLES, 0, Engine.modelLibrary.get(0 /* tank */).faceCount);
+            gl.drawArrays(gl.TRIANGLES, 0, Engine.modelLibrary.get(0 /* tank */).model.byteLength / 32);
             requestAnimationFrame(loop);
         };
         requestAnimationFrame(loop);
@@ -302,7 +302,7 @@ Model.parseFile = (fileContents) => {
         if (command === 'v') {
             pos = _a.stringsToNumbers(values);
             boundingBox.updateBounds(pos);
-            positions.push(_a.stringsToNumbers(values));
+            positions.push(pos);
         }
         else if (command === 'vt') {
             texCoords.push(_a.stringsToNumbers(values));
@@ -315,8 +315,8 @@ Model.parseFile = (fileContents) => {
             for (const group of values) {
                 const [positionIndex, texCoordIndex, normalIndex] = _a.stringsToNumbers(group.split('/'));
                 arrayBufferSource.push(...positions[positionIndex - 1]);
-                arrayBufferSource.push(...texCoords[texCoordIndex - 1]);
                 arrayBufferSource.push(...normals[normalIndex - 1]);
+                arrayBufferSource.push(...texCoords[texCoordIndex - 1]);
             }
         }
     }

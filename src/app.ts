@@ -103,16 +103,12 @@ class Main
         var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
         var texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
         var normalAttribLocation = gl.getAttribLocation(program, 'vertNormal');
-
-        gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
-        gl.vertexAttribPointer(texCoordAttribLocation, 2, gl.FLOAT, false, 2 * Float32Array.BYTES_PER_ELEMENT, 12);
-        gl.vertexAttribPointer(normalAttribLocation, 3, gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 24);
-
+        gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
+        gl.vertexAttribPointer(normalAttribLocation, 3, gl.FLOAT, false, 32, 12);
+        gl.vertexAttribPointer(texCoordAttribLocation, 2, gl.FLOAT, false, 32, 24);
         gl.enableVertexAttribArray(positionAttribLocation);
-        gl.enableVertexAttribArray(texCoordAttribLocation);
         gl.enableVertexAttribArray(normalAttribLocation);
-        
-        
+        gl.enableVertexAttribArray(texCoordAttribLocation);
     
         //  Create Texture
     
@@ -123,7 +119,7 @@ class Main
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, Engine.textureLibrary.get(TextureTypes.blueTank));
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, Engine.textureLibrary.get(TextureTypes.marinTank));
 
         gl.bindTexture(gl.TEXTURE_2D, null);
     
@@ -149,21 +145,21 @@ class Main
     
         // Main Render Loop
     
-        var xRotationMat = new Float32Array(16);
+        var xRotationMat = new Float32Array(16); 
         var yRotationMat = new Float32Array(16);
         var scaleMat = new Float32Array(16);
     
-        var identityMatrix = new Float32Array(16);
-        mat4.identity(identityMatrix);
+        var identityMatrix = mat4.create();
     
         var theta = 0;
+        console.log(Engine.modelLibrary.get(ModelTypes.tank).model.byteLength / 32)
     
         var loop = () => 
         {
             theta = performance.now() / 1000 / 6 * 2 * Math.PI;
             mat4.rotate(xRotationMat, identityMatrix, theta, [1, 0, 0]);
             mat4.rotate(yRotationMat, identityMatrix, theta / 4, [0, 1, 0]);
-            mat4.scale(scaleMat, identityMatrix, [1,1,1]);
+            mat4.scale(scaleMat, identityMatrix, [10,10,10]);
             mat4.mul(worldMatrix, xRotationMat, yRotationMat);
             mat4.mul(worldMatrix, worldMatrix, scaleMat);
     
@@ -175,7 +171,7 @@ class Main
             gl.bindTexture(gl.TEXTURE_2D, tankTexture);
             gl.activeTexture(gl.TEXTURE0);
             
-            gl.drawArrays(gl.TRIANGLES, 0 , Engine.modelLibrary.get(ModelTypes.tank).faceCount);
+            gl.drawArrays(gl.TRIANGLES, 0 , Engine.modelLibrary.get(ModelTypes.tank).model.byteLength / 32);
             requestAnimationFrame(loop);
         }
         requestAnimationFrame(loop);
@@ -479,7 +475,7 @@ class Model
             {
                 pos = this.stringsToNumbers(values) as [number, number, number];
                 boundingBox.updateBounds(pos);
-                positions.push(this.stringsToNumbers(values));
+                positions.push(pos);
             }
             else if (command === 'vt')
             {
@@ -499,8 +495,9 @@ class Model
                     const [ positionIndex, texCoordIndex, normalIndex] = this.stringsToNumbers(group.split('/'));
 
                     arrayBufferSource.push(...positions[positionIndex - 1]);
-                    arrayBufferSource.push(...texCoords[texCoordIndex - 1]);
                     arrayBufferSource.push(...normals[normalIndex - 1]);
+                    arrayBufferSource.push(...texCoords[texCoordIndex - 1]);
+                    
                 }
             }
 
