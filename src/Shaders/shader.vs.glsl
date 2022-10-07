@@ -9,12 +9,12 @@ layout(location=2) in vec2 vertTexCoord;
 flat out vec2 fragTexCoord;
 flat out vec3 fragNormal;
 
-uniform mat4 mWorld;
+uniform mat4 mModel;
 uniform mat4 mView;
 uniform mat4 mProj;
 
 void main() {
     fragTexCoord = vertTexCoord;
     fragNormal = vertNormal;
-    gl_Position = (mProj * mView * mWorld * vec4(vertPosition, 1.0));
+    gl_Position = (mProj * mView * mModel * vec4(vertPosition, 1.0));
 }

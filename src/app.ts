@@ -4,7 +4,6 @@ const { mat4 , vec3, quat } = glMatrix;
 const enum TextureTypes
 {
     none = -1,
-
     blueTank,
     redTank,
     ashTank,
@@ -34,25 +33,27 @@ const enum FragmentShaderTypes
     default,
 }
 
+const enum SceneTypes
+{
+    titleScene,
+    mainGame
+}
+
 var start = function() 
 {
-    Main.InitApp()
+    Main.InitApp();
 }
 
 class Main
 {
     static gl: WebGL2RenderingContext;
+    static canvas: HTMLCanvasElement;
 
     static InitApp() {
 
-        var canvas = document.getElementById('game-surface') as HTMLCanvasElement;
+        Main.canvas = document.getElementById('game-surface') as HTMLCanvasElement;
 
-        Main.gl = canvas.getContext('webgl2') as WebGL2RenderingContext;
-
-        if (!Main.gl) {
-            console.log('WebGL not supported, falling back on experimental-webgl');
-            Main.gl = canvas.getContext('experimental-webgl') as WebGL2RenderingContext;
-        }
+        Main.gl = Main.canvas.getContext('webgl2') as WebGL2RenderingContext;
     
         if (!Main.gl) {
             alert('Your browser does not support WebGL');
@@ -60,123 +61,65 @@ class Main
     
         Main.gl.clearColor(0.75, 0.85, 0.8, 1.0);
         Main.gl.clear(Main.gl.COLOR_BUFFER_BIT | Main.gl.DEPTH_BUFFER_BIT);
-        Main.gl.enable(Main.gl.DEPTH_TEST)
+        Main.gl.enable(Main.gl.DEPTH_TEST);
+        Main.gl.depthFunc(Main.gl.LEQUAL);
     
         Main.gl.enable(Main.gl.CULL_FACE);
         Main.gl.cullFace(Main.gl.BACK);
         Main.gl.frontFace(Main.gl.CCW);
 
         (async () => {
-            await Engine.Initialise(Main.gl);
-            this.RunApp(Main.gl, canvas);
+            await Engine.Initialise();
+            SceneManager.Initialise(SceneTypes.mainGame);
+            this.RunApp();
         })();
     };
     
-    static RunApp(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement)  
+    static RunApp()  
     {
 
-        var program = gl.createProgram()!;
-        gl.attachShader(program, Engine.shaderLibrary.getVertex(VertexShaderTypes.default));
-        gl.attachShader(program, Engine.shaderLibrary.getFragment(FragmentShaderTypes.default));
-        gl.linkProgram(program);
-
-    
-        if(!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            console.error('ERROR linking program!', gl.getProgramInfoLog(program));
-            return;
-        }
-    
-        gl.validateProgram(program);
-        if(!gl.getProgramParameter(program, gl.VALIDATE_STATUS)) {
-            console.error('ERROR validating program!', gl.getProgramInfoLog(program));
-            return;
-        }
-    
-        // Create Buffer
-    
-    
-        var tankBufferObject = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, tankBufferObject);
-        gl.bufferData(gl.ARRAY_BUFFER, Engine.modelLibrary.get(ModelTypes.tank).model, gl.STATIC_DRAW);
-
         
-        var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
-        var texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
-        var normalAttribLocation = gl.getAttribLocation(program, 'vertNormal');
-        gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
-        gl.vertexAttribPointer(normalAttribLocation, 3, gl.FLOAT, false, 32, 12);
-        gl.vertexAttribPointer(texCoordAttribLocation, 2, gl.FLOAT, false, 32, 24);
-        gl.enableVertexAttribArray(positionAttribLocation);
-        gl.enableVertexAttribArray(normalAttribLocation);
-        gl.enableVertexAttribArray(texCoordAttribLocation);
-    
-        //  Create Texture
-    
-        var tankTexture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, tankTexture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, Engine.textureLibrary.get(TextureTypes.marinTank));
-
-        gl.bindTexture(gl.TEXTURE_2D, null);
-    
-    
-        // What program we are using
-        gl.useProgram(program);
-    
-        var matWorldUniformLocation = gl.getUniformLocation(program, 'mWorld');
-        var matViewUniformLocation = gl.getUniformLocation(program, 'mView');
-        var matProjUniformLocation = gl.getUniformLocation(program, 'mProj');
-    
-        var worldMatrix = new Float32Array(16);
-        var projMatrix = new Float32Array(16);
-        var viewMatrix = new Float32Array(16);
-    
-        mat4.identity(worldMatrix);
-        mat4.lookAt(viewMatrix, [0, 0, -7], [0, 0, 0], [0, 1, 0]);
-        mat4.perspective(projMatrix, Math.PI/4.0, canvas.width / canvas.height, 0.1, 1000.0);
-    
-        gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
-        gl.uniformMatrix4fv(matViewUniformLocation, false, viewMatrix);
-        gl.uniformMatrix4fv(matProjUniformLocation, false, projMatrix);
-    
-        // Main Render Loop
-    
-        var xRotationMat = new Float32Array(16); 
-        var yRotationMat = new Float32Array(16);
-        var scaleMat = new Float32Array(16);
-    
-        var identityMatrix = mat4.create();
-    
-        var theta = 0;
-        console.log(Engine.modelLibrary.get(ModelTypes.tank).model.byteLength / 32)
-    
         var loop = () => 
         {
-            theta = performance.now() / 1000 / 6 * 2 * Math.PI;
-            mat4.rotate(xRotationMat, identityMatrix, theta, [1, 0, 0]);
-            mat4.rotate(yRotationMat, identityMatrix, theta / 4, [0, 1, 0]);
-            mat4.scale(scaleMat, identityMatrix, [10,10,10]);
-            mat4.mul(worldMatrix, xRotationMat, yRotationMat);
-            mat4.mul(worldMatrix, worldMatrix, scaleMat);
-    
-            gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
-    
-            gl.clearColor(0.75, 0.85, 0.8, 1.0);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    
-            gl.bindTexture(gl.TEXTURE_2D, tankTexture);
-            gl.activeTexture(gl.TEXTURE0);
-            
-            gl.drawArrays(gl.TRIANGLES, 0 , Engine.modelLibrary.get(ModelTypes.tank).model.byteLength / 32);
+            Main.gl.clearColor(0.75, 0.85, 0.8, 1.0);
+            Main.gl.clear(Main.gl.COLOR_BUFFER_BIT | Main.gl.DEPTH_BUFFER_BIT);
+            SceneManager.doUpdate();
             requestAnimationFrame(loop);
         }
         requestAnimationFrame(loop);
     
     
+    }
+
+}
+
+class SceneManager
+{
+    private static _currentScene: Scene
+
+    static Initialise(type: SceneTypes)
+    {
+        SceneManager.setScene(type)
+    }
+
+    public static get currentScene()
+    {
+        return SceneManager._currentScene
+    }
+
+    public static setScene(type: SceneTypes)
+    {
+        switch (type)
+        {
+            case SceneTypes.mainGame:
+                SceneManager._currentScene = new TankScene()
+        }
+    }
+
+    public static doUpdate()
+    {
+        SceneManager._currentScene.update()
+        SceneManager._currentScene.render()
     }
 
 }
@@ -192,7 +135,7 @@ class Engine
     private static _shaderLibrary: ShaderLibrary
     public static get shaderLibrary(){ return this._shaderLibrary }
 
-    public static async Initialise(gl: WebGL2RenderingContext)
+    public static async Initialise()
     {
         return new Promise<void>(async (resolve, reject) => {
             Engine._textureLibrary = new TextureLibrary();
@@ -200,7 +143,7 @@ class Engine
             Engine._modelLibrary = new ModelLibrary();
             await Engine._modelLibrary.Initialise();
             Engine._shaderLibrary = new ShaderLibrary();
-            await Engine._shaderLibrary.Initialise(gl);
+            await Engine._shaderLibrary.Initialise();
             resolve();
         });
 
@@ -221,6 +164,9 @@ class Apex
     toRender: boolean = true;
     parentModelMatrix = new Float32Array(16);
 
+    viewMatrix = new Float32Array(16);
+    projectionMatrix = new Float32Array(16);
+
     private _modelMatrix = new Float32Array(16);
 
     children: Apex[] = []; // Array of Apex 's
@@ -235,7 +181,7 @@ class Apex
 
     updateModelMatrix()
     {   
-        mat4.fromRotationTranslationScale(this.modelMatrix, this.quaternion, this.position, this.scale);
+        mat4.fromRotationTranslationScale(this._modelMatrix, this.quaternion, this.position, this.scale);
     }
 
     constructor(name = "Apex")
@@ -243,6 +189,9 @@ class Apex
         this.name = name;
         quat.fromEuler(this.quaternion, this.rotation[0], this.rotation[1], this.rotation[2]);
         mat4.identity(this.parentModelMatrix);
+        mat4.identity(this.viewMatrix);
+        mat4.identity(this.projectionMatrix);
+        mat4.identity(this._modelMatrix);
         this.updateModelMatrix();
     }
 
@@ -268,17 +217,16 @@ class Apex
         }
     }
 
-    doRender(gl: WebGL2RenderingContext) { }
+    doRender(viewMatrix: any, projectionMatrix: any) { }
 
-    render(gl: WebGL2RenderingContext)
+    render()
     {
-        if (this.toRender) { this.doRender(gl) }
+        if (this.toRender) { this.doRender( this.viewMatrix, this.projectionMatrix) }
 
         for (let child of this.children)
         {
-            child.render(gl)
+            child.render()
         }
-
     }
 
     
@@ -301,7 +249,7 @@ class Apex
     setPositionY( y: number ) { this.setPosition(this.getPositionX(), y, this.getPositionZ())}
     setPositionZ( z: number ) { this.setPosition(this.getPositionX(), this.getPositionY(), z)}
     
-    move(x = 0, y  = 0, z  = 0) { this.setPosition(this.getPositionX() + x, this.getPositionY() + y, this.getPositionZ() + z)}
+    move(x: number, y: number,z: number) { this.setPosition(this.getPositionX() + x, this.getPositionY() + y, this.getPositionZ() + z)}
     
     getPosition() { return this.position }
     getPositionX()   { return this.position[0] }
@@ -322,7 +270,7 @@ class Apex
     setRotationY( y: number ) { this.setRotation(this.getRotationX(), y, this.getRotationZ())}
     setRotationZ( z: number ) { this.setRotation(this.getRotationX(), this.getRotationY(), z)}
     
-    rotate(x = 0, y = 0,z  = 0) { this.setRotation(this.getRotationX() + x, this.getRotationY() + y, this.getRotationZ() + z)}
+    rotate(x: number, y: number,z: number) { this.setRotation(this.getRotationX() + x, this.getRotationY() + y, this.getRotationZ() + z)}
     
     getRotation()   { return this.rotation }
     getRotationX()   { return this.rotation[0] }
@@ -342,7 +290,7 @@ class Apex
     setScaleY( y: number ) { this.setScale(this.getScaleX(), y, this.getScaleZ())}
     setScaleZ( z: number ) { this.setScale(this.getScaleX(), this.getScaleY(), z)}
     
-    scaleF(x  = 0, y  = 0,z  = 0) { this.setScale(this.getScaleX() + x, this.getScaleY() + y, this.getScaleZ() + z)}
+    scaleF(x: number, y: number,z: number) { this.setScale(this.getScaleX() + x, this.getScaleY() + y, this.getScaleZ() + z)}
     
     getScale()   { return this.scale }
     getScaleX()   { return this.scale[0] }
@@ -355,42 +303,116 @@ class Apex
 
 class Scene extends Apex
 {
-    viewMatrix = new Float32Array(16);
-    projectionMatrix = new Float32Array(16);
+
 
     constructor()
     {
-        super();
+        super("Scene");
         mat4.identity(this.viewMatrix);
         mat4.identity(this.projectionMatrix);
         this.buildScene();
     }
 
     buildScene() { }
-
-    render(gl: WebGL2RenderingContext)
-    {
-        super.render(gl);
-    }
-
 }
 
 class GameObject extends Apex
 {
     private normalMatrix = [];
+    private program!: WebGLProgram;
     
-    mesh!: Mesh;
+    modelBuffer!: WebGLBuffer;
+    boundingBox!: BoundingBox;
 
-    private baseTexture: TextureTypes = TextureTypes.none;
-    private normalMap: TextureTypes = TextureTypes.none;
+    private baseTexture!: WebGLTexture;
+    private normalMap!: WebGLTexture;
+
+    private positionAttribLocation!: number;
+    private texCoordAttribLocation!: number;
+    private normalAttribLocation!: number;
+
+    private matModelUniformLocation!: WebGLUniformLocation;
+    private matProjUniformLocation!: WebGLUniformLocation;
+    private matViewUniformLocation!: WebGLUniformLocation;
 
     constructor(name: string, type: ModelTypes)
     {
         super(name);
-        this.mesh = Engine.modelLibrary.get(type);
+        
+        this.program = ShaderLibrary.createProgram( VertexShaderTypes.default, FragmentShaderTypes.default)
+
+        var mesh = Engine.modelLibrary.get(type);
+        this.boundingBox = mesh.boundingBox;
+
+        this.modelBuffer = Main.gl.createBuffer()!;
+        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
+        Main.gl.bufferData(Main.gl.ARRAY_BUFFER, mesh.model, Main.gl.STATIC_DRAW);
+
+        this.positionAttribLocation = Main.gl.getAttribLocation(this.program, 'vertPosition');
+        this.texCoordAttribLocation = Main.gl.getAttribLocation(this.program, 'vertTexCoord');
+        this.normalAttribLocation = Main.gl.getAttribLocation(this.program, 'vertNormal');
+
+        this.matModelUniformLocation = Main.gl.getUniformLocation(this.program, 'mModel')!;
+        this.matViewUniformLocation = Main.gl.getUniformLocation(this.program, 'mView')!;
+        this.matProjUniformLocation = Main.gl.getUniformLocation(this.program, 'mProj')!;
+
+        Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
+        Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 32, 12);
+        Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 32, 24);
+        Main.gl.enableVertexAttribArray(this.positionAttribLocation);
+        Main.gl.enableVertexAttribArray(this.normalAttribLocation);
+        Main.gl.enableVertexAttribArray(this.texCoordAttribLocation);
+
+        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, null);
+
     }
 
+    update(): void {
+        super.update();
+    }
 
+    doRender(viewMatrix: any, projectionMatrix: any): void {
+        Main.gl.useProgram(this.program);
+        Main.gl.enable(Main.gl.DEPTH_TEST);
+
+        Main.gl.uniformMatrix4fv(this.matModelUniformLocation, false, this.modelMatrix);
+        Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, viewMatrix);
+        Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, projectionMatrix);
+
+        Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
+        Main.gl.activeTexture(Main.gl.TEXTURE0);
+        
+        Main.gl.drawArrays(Main.gl.TRIANGLES, 0 , Engine.modelLibrary.get(ModelTypes.tank).model.byteLength / 32);
+
+    }
+
+    useBaseColourTexture(type: TextureTypes)
+    {
+        this.baseTexture = Main.gl.createTexture()!;
+        Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.CLAMP_TO_EDGE);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.CLAMP_TO_EDGE);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
+
+        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.get(type));
+
+        Main.gl.bindTexture(Main.gl.TEXTURE_2D, null);
+    }
+
+    useNormalMapTexture(type: TextureTypes)
+    {
+        this.normalMap = Main.gl.createTexture()!;
+        Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.normalMap);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.CLAMP_TO_EDGE);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.CLAMP_TO_EDGE);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
+        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
+
+        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.get(type));
+
+        Main.gl.bindTexture(Main.gl.TEXTURE_2D, null);
+    }
 
 }
 
@@ -417,11 +439,9 @@ class Mesh
 {
     model!: ArrayBuffer;
     boundingBox!: BoundingBox;
-    faceCount: number;
-    constructor(model: ArrayBuffer, bounds: BoundingBox, count: number) {
+    constructor(model: ArrayBuffer, bounds: BoundingBox) {
         this.model = model;
         this.boundingBox = bounds;
-        this.faceCount = count;
     }
 }
 
@@ -503,14 +523,14 @@ class Model
 
         }
 
-        return new Mesh(new Float32Array(arrayBufferSource).buffer, boundingBox, faceCount);
+        return new Mesh(new Float32Array(arrayBufferSource).buffer, boundingBox);
     }   
 
 }
 
 class TextureLibrary
 {
-    private library: TexImageSource[] = [];
+    private library: HTMLImageElement[] = [];
 
     Initialise()
     {
@@ -532,7 +552,7 @@ class TextureLibrary
         });
     }
 
-    public get(type: TextureTypes): TexImageSource
+    public get(type: TextureTypes): HTMLImageElement
     {
         return this.library[type]
     }
@@ -557,7 +577,7 @@ class ShaderLibrary
 
 
 
-    public Initialise(gl: WebGL2RenderingContext)
+    public Initialise()
     {
         return new Promise<void>(async (resolve, reject) => {
             // Amound of shaders
@@ -566,12 +586,12 @@ class ShaderLibrary
 
             for (let i = 0; i < stringlib.length; i++)
             {
-                this.vertexLibrary[i] = gl.createShader(gl.VERTEX_SHADER)!;
-                gl.shaderSource(this.vertexLibrary[i], stringlib[i]);
-                gl.compileShader(this.vertexLibrary[i]);
+                this.vertexLibrary[i] = Main.gl.createShader(Main.gl.VERTEX_SHADER)!;
+                Main.gl.shaderSource(this.vertexLibrary[i], stringlib[i]);
+                Main.gl.compileShader(this.vertexLibrary[i]);
 
-                if (!gl.getShaderParameter(this.vertexLibrary[i], gl.COMPILE_STATUS)) {
-                    console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(this.vertexLibrary[i]));
+                if (!Main.gl.getShaderParameter(this.vertexLibrary[i], Main.gl.COMPILE_STATUS)) {
+                    console.error('ERROR compiling vertex shader!', Main.gl.getShaderInfoLog(this.vertexLibrary[i]));
                     return;
                 }
             }
@@ -581,18 +601,37 @@ class ShaderLibrary
 
             for (let i = 0; i < stringlib.length; i++)
             {
-                this.fragmentLibrary[i] = gl.createShader(gl.FRAGMENT_SHADER)!;
-                gl.shaderSource(this.fragmentLibrary[i], stringlib[i]);
-                gl.compileShader(this.fragmentLibrary[i]);
+                this.fragmentLibrary[i] = Main.gl.createShader(Main.gl.FRAGMENT_SHADER)!;
+                Main.gl.shaderSource(this.fragmentLibrary[i], stringlib[i]);
+                Main.gl.compileShader(this.fragmentLibrary[i]);
 
-                if (!gl.getShaderParameter(this.fragmentLibrary[i], gl.COMPILE_STATUS)) {
-                    console.error('ERROR compiling fragment shader!', gl.getShaderInfoLog(this.fragmentLibrary[i]));
+                if (!Main.gl.getShaderParameter(this.fragmentLibrary[i], Main.gl.COMPILE_STATUS)) {
+                    console.error('ERROR compiling fragment shader!', Main.gl.getShaderInfoLog(this.fragmentLibrary[i]));
                     return;
                 }
             }
             resolve();
 
         });
+    }
+
+    public static createProgram(vert: VertexShaderTypes, frag: FragmentShaderTypes): WebGLProgram
+    {
+        var program = Main.gl.createProgram()!;
+        Main.gl.attachShader(program, Engine.shaderLibrary.getVertex(vert));
+        Main.gl.attachShader(program, Engine.shaderLibrary.getFragment(frag));
+        Main.gl.linkProgram(program);
+        if(!Main.gl.getProgramParameter(program, Main.gl.LINK_STATUS)) {
+            console.error('ERROR linking program!', Main.gl.getProgramInfoLog(program));
+        }
+    
+        Main.gl.validateProgram(program);
+        if(!Main.gl.getProgramParameter(program, Main.gl.VALIDATE_STATUS)) {
+            console.error('ERROR validating program!', Main.gl.getProgramInfoLog(program));
+        }
+
+        return program;
+
     }
 
 }
@@ -618,7 +657,7 @@ class ResourceLoader
     
     // Load an image resource from a file over the network
     static loadImageResource(url: string) {
-        return new Promise<TexImageSource>((resolve) => {
+        return new Promise<HTMLImageElement>((resolve) => {
             var image = new Image();
             image.onload = function() {
                 resolve(image);
@@ -666,6 +705,28 @@ class BoundingBox {
         if (pos[1] < this.minBounds[1]) { this.minBounds[1] = pos[1] }
         if (pos[0] < this.minBounds[0]) { this.minBounds[0] = pos[0] }
         if (pos[2] < this.minBounds[2]) { this.minBounds[2] = pos[2] }
+    }
+
+}
+
+class TankScene extends Scene
+{
+
+
+    buildScene()
+    {
+        var bruh = new GameObject("Tank 1", ModelTypes.tank);
+        bruh.useBaseColourTexture(TextureTypes.ashTank);
+        mat4.lookAt(this.viewMatrix, [0, 0, -7], [0, 0, 0], [0, 1, 0]);
+        mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
+
+        this.addChld(bruh)
+
+    }
+
+    doUpdate(): void {
+        this.children[0].rotate(0.2,0.2,0.2);
+        this.children[0].uniformSetScale(3);
     }
 
 }
