@@ -16,7 +16,7 @@ var start = function () {
 class Main {
     static InitApp() {
         var canvas = document.getElementById('game-surface');
-        Main.gl = canvas.getContext('webgl');
+        Main.gl = canvas.getContext('webgl2');
         if (!Main.gl) {
             console.log('WebGL not supported, falling back on experimental-webgl');
             Main.gl = canvas.getContext('experimental-webgl');
@@ -37,55 +37,69 @@ class Main {
     }
     ;
     static RunApp(gl, canvas) {
-        var program = Main.gl.createProgram();
-        Main.gl.attachShader(program, Engine.shaderLibrary.getFragment(0 /* defaultFrag */));
-        Main.gl.attachShader(program, Engine.shaderLibrary.getVertex(0 /* defaultVert */));
-        Main.gl.linkProgram(program);
-        if (!Main.gl.getProgramParameter(program, Main.gl.LINK_STATUS)) {
-            console.error('ERROR linking program!', Main.gl.getProgramInfoLog(program));
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader, Engine.shaderLibrary.getVertex(0 /* defaultVert */));
+        gl.compileShader(vertexShader);
+        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(vertexShader));
             return;
         }
-        Main.gl.validateProgram(program);
-        if (!Main.gl.getProgramParameter(program, Main.gl.VALIDATE_STATUS)) {
-            console.error('ERROR validating program!', Main.gl.getProgramInfoLog(program));
+        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader, Engine.shaderLibrary.getFragment(0 /* defaultFrag */));
+        gl.compileShader(fragmentShader);
+        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(vertexShader));
+            return;
+        }
+        var program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('ERROR linking program!', gl.getProgramInfoLog(program));
+            return;
+        }
+        gl.validateProgram(program);
+        if (!gl.getProgramParameter(program, gl.VALIDATE_STATUS)) {
+            console.error('ERROR validating program!', gl.getProgramInfoLog(program));
             return;
         }
         // Create Buffer
-        var tankBufferObject = Main.gl.createBuffer();
-        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, tankBufferObject);
-        Main.gl.bufferData(Main.gl.ARRAY_BUFFER, Engine.modelLibrary.get(0 /* tank */).model, Main.gl.STATIC_DRAW);
-        var positionAttribLocation = Main.gl.getAttribLocation(program, 'vertPosition');
-        var texCoordAttribLocation = Main.gl.getAttribLocation(program, 'vertTexCoord');
-        var normalAttribLocation = Main.gl.getAttribLocation(program, 'vertNormal');
-        Main.gl.vertexAttribPointer(positionAttribLocation, 3, Main.gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
-        Main.gl.vertexAttribPointer(texCoordAttribLocation, 2, Main.gl.FLOAT, false, 2 * Float32Array.BYTES_PER_ELEMENT, 12);
-        Main.gl.vertexAttribPointer(normalAttribLocation, 3, Main.gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 24);
-        Main.gl.enableVertexAttribArray(positionAttribLocation);
-        Main.gl.enableVertexAttribArray(texCoordAttribLocation);
-        Main.gl.enableVertexAttribArray(normalAttribLocation);
+        var tankBufferObject = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, tankBufferObject);
+        gl.bufferData(gl.ARRAY_BUFFER, Engine.modelLibrary.get(0 /* tank */).model, gl.STATIC_DRAW);
+        var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
+        var texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
+        var normalAttribLocation = gl.getAttribLocation(program, 'vertNormal');
+        gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+        gl.vertexAttribPointer(texCoordAttribLocation, 2, gl.FLOAT, false, 2 * Float32Array.BYTES_PER_ELEMENT, 12);
+        gl.vertexAttribPointer(normalAttribLocation, 3, gl.FLOAT, false, 3 * Float32Array.BYTES_PER_ELEMENT, 24);
+        gl.enableVertexAttribArray(positionAttribLocation);
+        gl.enableVertexAttribArray(texCoordAttribLocation);
+        gl.enableVertexAttribArray(normalAttribLocation);
         //  Create Texture
-        var tankTexture = Main.gl.createTexture();
-        Main.gl.bindTexture(Main.gl.TEXTURE_2D, tankTexture);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
-        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.get(0 /* blueTank */));
-        Main.gl.bindTexture(Main.gl.TEXTURE_2D, null);
+        var tankTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tankTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, Engine.textureLibrary.get(0 /* blueTank */));
+        gl.bindTexture(gl.TEXTURE_2D, null);
         // What program we are using
-        Main.gl.useProgram(program);
-        var matWorldUniformLocation = Main.gl.getUniformLocation(program, 'mWorld');
-        var matViewUniformLocation = Main.gl.getUniformLocation(program, 'mView');
-        var matProjUniformLocation = Main.gl.getUniformLocation(program, 'mProj');
+        gl.useProgram(program);
+        var matWorldUniformLocation = gl.getUniformLocation(program, 'mWorld');
+        var matViewUniformLocation = gl.getUniformLocation(program, 'mView');
+        var matProjUniformLocation = gl.getUniformLocation(program, 'mProj');
         var worldMatrix = new Float32Array(16);
         var projMatrix = new Float32Array(16);
         var viewMatrix = new Float32Array(16);
         mat4.identity(worldMatrix);
         mat4.lookAt(viewMatrix, [0, 0, -7], [0, 0, 0], [0, 1, 0]);
         mat4.perspective(projMatrix, Math.PI / 4.0, canvas.width / canvas.height, 0.1, 1000.0);
-        Main.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
-        Main.gl.uniformMatrix4fv(matViewUniformLocation, false, viewMatrix);
-        Main.gl.uniformMatrix4fv(matProjUniformLocation, false, projMatrix);
+        gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
+        gl.uniformMatrix4fv(matViewUniformLocation, false, viewMatrix);
+        gl.uniformMatrix4fv(matProjUniformLocation, false, projMatrix);
         // Main Render Loop
         var xRotationMat = new Float32Array(16);
         var yRotationMat = new Float32Array(16);
@@ -93,20 +107,19 @@ class Main {
         var identityMatrix = new Float32Array(16);
         mat4.identity(identityMatrix);
         var theta = 0;
-        console.log(Engine.modelLibrary.get(0 /* tank */).faceCount);
         var loop = () => {
             theta = performance.now() / 1000 / 6 * 2 * Math.PI;
             mat4.rotate(xRotationMat, identityMatrix, theta, [1, 0, 0]);
             mat4.rotate(yRotationMat, identityMatrix, theta / 4, [0, 1, 0]);
-            mat4.scale(scaleMat, identityMatrix, [0.1, 0.1, 0.1]);
+            mat4.scale(scaleMat, identityMatrix, [1, 1, 1]);
             mat4.mul(worldMatrix, xRotationMat, yRotationMat);
             mat4.mul(worldMatrix, worldMatrix, scaleMat);
-            Main.gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
-            Main.gl.clearColor(0.75, 0.85, 0.8, 1.0);
-            Main.gl.clear(Main.gl.COLOR_BUFFER_BIT | Main.gl.DEPTH_BUFFER_BIT);
-            Main.gl.bindTexture(Main.gl.TEXTURE_2D, tankTexture);
-            Main.gl.activeTexture(Main.gl.TEXTURE0);
-            Main.gl.drawElements(Main.gl.TRIANGLES, Engine.modelLibrary.get(0 /* tank */).faceCount, Main.gl.UNSIGNED_SHORT, 0);
+            gl.uniformMatrix4fv(matWorldUniformLocation, false, worldMatrix);
+            gl.clearColor(0.75, 0.85, 0.8, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.bindTexture(gl.TEXTURE_2D, tankTexture);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.drawArrays(gl.TRIANGLES, 0, Engine.modelLibrary.get(0 /* tank */).faceCount);
             requestAnimationFrame(loop);
         };
         requestAnimationFrame(loop);
@@ -124,7 +137,7 @@ class Engine {
                 Engine._modelLibrary = new ModelLibrary();
                 yield Engine._modelLibrary.Initialise();
                 Engine._shaderLibrary = new ShaderLibrary();
-                yield Engine._shaderLibrary.Initialise(Main.gl);
+                yield Engine._shaderLibrary.Initialise(gl);
                 resolve();
             }));
         });
@@ -361,27 +374,8 @@ class ShaderLibrary {
     }
     Initialise(gl) {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-            var stringLib = new Array(1);
-            stringLib[0 /* defaultVert */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.vs.glsl');
-            for (let i = 0; i < stringLib.length; i++) {
-                console.log(stringLib[i]);
-                this.vertexLibrary[i] = gl.createShader(gl.VERTEX_SHADER);
-                gl.shaderSource(this.vertexLibrary[i], stringLib[i]);
-                gl.compileShader(this.vertexLibrary[i]);
-                if (Main.gl.getShaderParameter(this.vertexLibrary[i], gl.COMPILE_STATUS)) {
-                    console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(this.vertexLibrary[i]));
-                }
-            }
-            stringLib = new Array(1);
-            stringLib[0 /* defaultFrag */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.fs.glsl');
-            for (let i = 0; i < stringLib.length; i++) {
-                this.fragmentLibrary[i] = gl.createShader(gl.FRAGMENT_SHADER);
-                gl.shaderSource(this.fragmentLibrary[i], stringLib[i]);
-                gl.compileShader(this.fragmentLibrary[i]);
-                if (gl.getShaderParameter(this.fragmentLibrary[i], gl.COMPILE_STATUS)) {
-                    console.error('ERROR compiling fragment shader!', gl.getShaderInfoLog(this.fragmentLibrary[i]));
-                }
-            }
+            this.vertexLibrary[0 /* defaultVert */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.vs.glsl');
+            this.fragmentLibrary[0 /* defaultFrag */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.fs.glsl');
             resolve();
         }));
     }
