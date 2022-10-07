@@ -37,23 +37,9 @@ class Main {
     }
     ;
     static RunApp(gl, canvas) {
-        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-        gl.shaderSource(vertexShader, Engine.shaderLibrary.getVertex(0 /* defaultVert */));
-        gl.compileShader(vertexShader);
-        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-            console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(vertexShader));
-            return;
-        }
-        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(fragmentShader, Engine.shaderLibrary.getFragment(0 /* defaultFrag */));
-        gl.compileShader(fragmentShader);
-        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-            console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(vertexShader));
-            return;
-        }
         var program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
+        gl.attachShader(program, Engine.shaderLibrary.getVertex(0 /* default */));
+        gl.attachShader(program, Engine.shaderLibrary.getFragment(0 /* default */));
         gl.linkProgram(program);
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error('ERROR linking program!', gl.getProgramInfoLog(program));
@@ -374,8 +360,29 @@ class ShaderLibrary {
     }
     Initialise(gl) {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-            this.vertexLibrary[0 /* defaultVert */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.vs.glsl');
-            this.fragmentLibrary[0 /* defaultFrag */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.fs.glsl');
+            // Amound of shaders
+            var stringlib = new Array(1);
+            stringlib[0 /* default */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.vs.glsl');
+            for (let i = 0; i < stringlib.length; i++) {
+                this.vertexLibrary[i] = gl.createShader(gl.VERTEX_SHADER);
+                gl.shaderSource(this.vertexLibrary[i], stringlib[i]);
+                gl.compileShader(this.vertexLibrary[i]);
+                if (!gl.getShaderParameter(this.vertexLibrary[i], gl.COMPILE_STATUS)) {
+                    console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(this.vertexLibrary[i]));
+                    return;
+                }
+            }
+            stringlib = new Array(1);
+            stringlib[0 /* default */] = yield ResourceLoader.loadTextResource('/src/Shaders/shader.fs.glsl');
+            for (let i = 0; i < stringlib.length; i++) {
+                this.fragmentLibrary[i] = gl.createShader(gl.FRAGMENT_SHADER);
+                gl.shaderSource(this.fragmentLibrary[i], stringlib[i]);
+                gl.compileShader(this.fragmentLibrary[i]);
+                if (!gl.getShaderParameter(this.fragmentLibrary[i], gl.COMPILE_STATUS)) {
+                    console.error('ERROR compiling fragment shader!', gl.getShaderInfoLog(this.fragmentLibrary[i]));
+                    return;
+                }
+            }
             resolve();
         }));
     }

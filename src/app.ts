@@ -24,12 +24,14 @@ const enum ModelTypes
     tank
 }
 
-const enum ShaderTypes
+const enum VertexShaderTypes
 {
-    defaultVert = 0,
+    default,
+}
 
-
-    defaultFrag = 0,
+const enum FragmentShaderTypes
+{
+    default,
 }
 
 var start = function() 
@@ -72,28 +74,10 @@ class Main
     
     static RunApp(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement)  
     {
-        const vertexShader = gl.createShader(gl.VERTEX_SHADER)!;
-        gl.shaderSource(vertexShader, Engine.shaderLibrary.getVertex(ShaderTypes.defaultVert));
-        gl.compileShader(vertexShader);
-
-        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-            console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(vertexShader));
-            return;
-        }
-
-        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER)!;
-        gl.shaderSource(fragmentShader, Engine.shaderLibrary.getFragment(ShaderTypes.defaultFrag));
-        gl.compileShader(fragmentShader);
-
-        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-            console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(vertexShader));
-            return;
-        }
-
 
         var program = gl.createProgram()!;
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
+        gl.attachShader(program, Engine.shaderLibrary.getVertex(VertexShaderTypes.default));
+        gl.attachShader(program, Engine.shaderLibrary.getFragment(FragmentShaderTypes.default));
         gl.linkProgram(program);
 
     
@@ -561,15 +545,15 @@ class TextureLibrary
 
 class ShaderLibrary
 {
-    private vertexLibrary: string[] = new Array(1);
-    private fragmentLibrary: string[] = new Array(1);
+    private vertexLibrary: WebGLShader[] = new Array(1);
+    private fragmentLibrary: WebGLShader[] = new Array(1);
 
-    getVertex(type: ShaderTypes)
+    getVertex(type: VertexShaderTypes)
     {
         return this.vertexLibrary[type]
     }
 
-    getFragment(type: ShaderTypes)
+    getFragment(type: FragmentShaderTypes)
     {
         return this.fragmentLibrary[type]
     }
@@ -579,8 +563,36 @@ class ShaderLibrary
     public Initialise(gl: WebGL2RenderingContext)
     {
         return new Promise<void>(async (resolve, reject) => {
-            this.vertexLibrary[ShaderTypes.defaultVert] = await ResourceLoader.loadTextResource('/src/Shaders/shader.vs.glsl');
-            this.fragmentLibrary[ShaderTypes.defaultFrag] = await ResourceLoader.loadTextResource('/src/Shaders/shader.fs.glsl');
+            // Amound of shaders
+            var stringlib: string[] = new Array(1); 
+            stringlib[VertexShaderTypes.default] = await ResourceLoader.loadTextResource('/src/Shaders/shader.vs.glsl');
+
+            for (let i = 0; i < stringlib.length; i++)
+            {
+                this.vertexLibrary[i] = gl.createShader(gl.VERTEX_SHADER)!;
+                gl.shaderSource(this.vertexLibrary[i], stringlib[i]);
+                gl.compileShader(this.vertexLibrary[i]);
+
+                if (!gl.getShaderParameter(this.vertexLibrary[i], gl.COMPILE_STATUS)) {
+                    console.error('ERROR compiling vertex shader!', gl.getShaderInfoLog(this.vertexLibrary[i]));
+                    return;
+                }
+            }
+
+            stringlib = new Array(1); 
+            stringlib[FragmentShaderTypes.default] = await ResourceLoader.loadTextResource('/src/Shaders/shader.fs.glsl');
+
+            for (let i = 0; i < stringlib.length; i++)
+            {
+                this.fragmentLibrary[i] = gl.createShader(gl.FRAGMENT_SHADER)!;
+                gl.shaderSource(this.fragmentLibrary[i], stringlib[i]);
+                gl.compileShader(this.fragmentLibrary[i]);
+
+                if (!gl.getShaderParameter(this.fragmentLibrary[i], gl.COMPILE_STATUS)) {
+                    console.error('ERROR compiling fragment shader!', gl.getShaderInfoLog(this.fragmentLibrary[i]));
+                    return;
+                }
+            }
             resolve();
 
         });
