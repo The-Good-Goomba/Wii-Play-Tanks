@@ -1,20 +1,28 @@
 #version 300 es
 precision mediump float;
 
+struct SpriteSheetInfo
+{
+    vec2 pos;
+    vec2 size;
+};
+
+uniform SpriteSheetInfo spriteInfo;
+
 layout(location=0) in vec3 vertPosition;
 layout(location=1) in vec3 vertNormal;
 layout(location=2) in vec2 vertTexCoord;
 
 
-flat out vec2 fragTexCoord;
-flat out vec3 fragNormal;
+out vec2 fragTexCoord;
+out vec3 fragNormal;
 
 uniform mat4 mModel;
 uniform mat4 mView;
 uniform mat4 mProj;
 
 void main() {
-    fragTexCoord = vertTexCoord;
+    fragTexCoord = vertTexCoord * spriteInfo.size + spriteInfo.pos;
     fragNormal = vertNormal;
     gl_Position = (mProj * mView * mModel * vec4(vertPosition, 1.0));
 }

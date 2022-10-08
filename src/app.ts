@@ -4,12 +4,18 @@ const { mat4 , vec3, quat } = glMatrix;
 const enum TextureTypes
 {
     none = -1,
+    bigSheet
+}
+
+const enum SpriteTypes
+{
+    none = -1,
     blueTank,
     redTank,
     ashTank,
     blackTank,
-    brownTank,
     greenTank,
+    oliveTank,
     marinTank,
     pinkTank,
     purpleTank,
@@ -311,6 +317,7 @@ class Scene extends Apex
     constructor()
     {
         super("Scene");
+        this.toRender = false;
         mat4.identity(this.viewMatrix);
         mat4.identity(this.projectionMatrix);
         this.buildScene();
@@ -328,7 +335,11 @@ class GameObject extends Apex
     boundingBox!: BoundingBox;
 
     private baseTexture!: WebGLTexture;
-    private normalMap!: WebGLTexture;
+    private sprite!: SpriteSheetInfo;
+
+    private spritePosUniformLocation!: WebGLUniformLocation;
+    private spriteSizeUniformLocation!: WebGLUniformLocation;
+    
 
     private positionAttribLocation!: number;
     private texCoordAttribLocation!: number;
@@ -345,7 +356,7 @@ class GameObject extends Apex
         this.program = ShaderLibrary.createProgram( VertexShaderTypes.default, FragmentShaderTypes.default)
 
         var mesh = Engine.modelLibrary.get(type);
-        this.boundingBox = mesh.boundingBox;
+        this.boundingBox = mesh.boundingBox; 
 
         this.modelBuffer = Main.gl.createBuffer()!;
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
@@ -359,6 +370,10 @@ class GameObject extends Apex
         this.matViewUniformLocation = Main.gl.getUniformLocation(this.program, 'mView')!;
         this.matProjUniformLocation = Main.gl.getUniformLocation(this.program, 'mProj')!;
 
+        this.spritePosUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.pos')!;
+        this.spriteSizeUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.size')!;
+
+
         Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
         Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 32, 12);
         Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 32, 24);
@@ -370,49 +385,43 @@ class GameObject extends Apex
 
     }
 
-    update(): void {
-        super.update();
-    }
-
     doRender(): void {
         Main.gl.useProgram(this.program);
-        Main.gl.enable(Main.gl.DEPTH_TEST);
+        
+        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
 
         Main.gl.uniformMatrix4fv(this.matModelUniformLocation, false, this.modelMatrix);
         Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, this.viewMatrix);
         Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, this.projectionMatrix);
 
-        Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
-        Main.gl.activeTexture(Main.gl.TEXTURE0);
+        if (this.baseTexture)
+        {
+            Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
+            Main.gl.activeTexture(Main.gl.TEXTURE0);
+
+            Main.gl.uniform2f(this.spritePosUniformLocation, this.sprite.pos[0], this.sprite.pos[1]);
+            Main.gl.uniform2f(this.spriteSizeUniformLocation, this.sprite.size[0], this.sprite.size[1]);
+
+        }
         
         Main.gl.drawArrays(Main.gl.TRIANGLES, 0 , Engine.modelLibrary.get(ModelTypes.tank).model.byteLength / 32);
 
     }
 
-    useBaseColourTexture(type: TextureTypes)
+    useBaseColourTexture(type: SpriteTypes)
     {
+        if (type == SpriteTypes.none) { return; }
+
+        this.sprite = Engine.textureLibrary.getSprite(type);
+
         this.baseTexture = Main.gl.createTexture()!;
         Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
+        Main.gl.texParameterf(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.REPEAT);
+        Main.gl.texParameterf(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.REPEAT);
+        Main.gl.texParameterf(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
+        Main.gl.texParameterf(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
 
-        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.get(type));
-
-        Main.gl.bindTexture(Main.gl.TEXTURE_2D, null);
-    }
-
-    useNormalMapTexture(type: TextureTypes)
-    {
-        this.normalMap = Main.gl.createTexture()!;
-        Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.normalMap);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
-
-        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.get(type));
+        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.getTexture(this.sprite.textureType));
 
         Main.gl.bindTexture(Main.gl.TEXTURE_2D, null);
     }
@@ -531,36 +540,60 @@ class Model
 
 }
 
+
 class TextureLibrary
 {
-    private library: HTMLImageElement[] = [];
+    private texLibrary: HTMLImageElement[] = [];
+    private spriteLib: SpriteSheetInfo[] = [];
 
     Initialise()
     {
         return new Promise<void>(async (resolve, reject) => {
-            this.library[TextureTypes.blueTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/player/tank_blue.png"); 
-            this.library[TextureTypes.redTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/player/tank_red.png");
-            this.library[TextureTypes.ashTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_ash.png");
-            this.library[TextureTypes.blackTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_black.png");
-            this.library[TextureTypes.brownTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_brown.png");
-            this.library[TextureTypes.greenTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_green.png");
-            this.library[TextureTypes.marinTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_marin.png");
-            this.library[TextureTypes.pinkTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_pink.png");
-            this.library[TextureTypes.purpleTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_purple.png");
-            this.library[TextureTypes.violetTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_violet.png");
-            this.library[TextureTypes.whiteTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_white.png");
-            this.library[TextureTypes.yellowTank] = await ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_yellow.png");
+            this.texLibrary[TextureTypes.bigSheet] = await ResourceLoader.loadImageResource("/src/Assets/Textures.png"); 
+            
+            this.spriteLib[SpriteTypes.blueTank] = { textureType: TextureTypes.bigSheet, pos: [877,1241], size: [32,32] };
+            this.spriteLib[SpriteTypes.ashTank] = { textureType: TextureTypes.bigSheet, pos: [185,1241], size: [32,32]}
+            this.spriteLib[SpriteTypes.blackTank] = { textureType: TextureTypes.bigSheet, pos: [259,1241], size: [32,32]}
+            this.spriteLib[SpriteTypes.greenTank] = { textureType: TextureTypes.bigSheet, pos: [148,1241], size: [32,32]}
+            this.spriteLib[SpriteTypes.oliveTank] = { textureType: TextureTypes.bigSheet, pos: [790,1241], size: [32,32]}
+            this.spriteLib[SpriteTypes.marinTank] = { textureType: TextureTypes.bigSheet, pos: [221,1241], size: [32,32]}
+            this.spriteLib[SpriteTypes.pinkTank] = { textureType: TextureTypes.bigSheet, pos: [4,1241], size: [32,32]}
+            this.spriteLib[SpriteTypes.purpleTank] = { textureType: TextureTypes.bigSheet, pos: [927,1172], size: [32,32]}
+            this.spriteLib[SpriteTypes.violetTank] = { textureType: TextureTypes.bigSheet, pos: [444,1241], size: [32,32]}
+            this.spriteLib[SpriteTypes.whiteTank] = { textureType: TextureTypes.bigSheet, pos: [110,1241], size: [32,32]}
+            this.spriteLib[SpriteTypes.yellowTank] = { textureType: TextureTypes.bigSheet, pos: [816,1241], size: [32,32]}
+
+            for (var i in this.spriteLib)
+            {
+                this.spriteLib[i].pos[0] /= this.getTexture(this.spriteLib[i].textureType).width;
+                this.spriteLib[i].pos[1] /= this.getTexture(this.spriteLib[i].textureType).height;
+                this.spriteLib[i].size[0] /= this.getTexture(this.spriteLib[i].textureType).width;
+                this.spriteLib[i].size[1] /= this.getTexture(this.spriteLib[i].textureType).height;
+            }
 
             resolve();
         });
     }
 
-    public get(type: TextureTypes): HTMLImageElement
+    public getTexture(type: TextureTypes): HTMLImageElement
     {
-        return this.library[type]
+        return this.texLibrary[type];
+    }
+
+
+    public getSprite(type: SpriteTypes): SpriteSheetInfo
+    {
+        return this.spriteLib[type];
     }
 
     
+}
+
+interface SpriteSheetInfo
+{
+    textureType: TextureTypes;
+    pos: [number, number];
+    size: [number, number];
 }
 
 class ShaderLibrary
@@ -719,7 +752,8 @@ class TankScene extends Scene
     buildScene()
     {
         var bruh = new GameObject("Tank 1", ModelTypes.tank);
-        bruh.useBaseColourTexture(TextureTypes.ashTank);
+        bruh.useBaseColourTexture(SpriteTypes.oliveTank);
+
         mat4.lookAt(this.viewMatrix, [0, 0, -7], [0, 0, 0], [0, 1, 0]);
         mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
         this.addChld(bruh)
@@ -728,7 +762,7 @@ class TankScene extends Scene
 
     doUpdate(): void {
         this.children[0].rotate(0.2,0.2,0.2);
-        this.children[0].uniformSetScale(3);
+        this.children[0].uniformSetScale(10);
 
 
 

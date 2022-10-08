@@ -1,13 +1,13 @@
 #version 300 es
 precision mediump float;
 
-flat in vec2 fragTexCoord;
-flat in vec3 fragNormal;
+in vec2 fragTexCoord;
+in vec3 fragNormal;
 
-uniform sampler2D sampler;
+uniform sampler2D among;
 
 out vec4 fragColour;
 void main()
 {
-    fragColour = vec4((texture(sampler, fragTexCoord).xyz), 1);
+    fragColour = texture(among, fragTexCoord);
 }

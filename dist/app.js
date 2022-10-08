@@ -183,6 +183,7 @@ class Apex {
 class Scene extends Apex {
     constructor() {
         super("Scene");
+        this.toRender = false;
         mat4.identity(this.viewMatrix);
         mat4.identity(this.projectionMatrix);
         this.buildScene();
@@ -205,6 +206,8 @@ class GameObject extends Apex {
         this.matModelUniformLocation = Main.gl.getUniformLocation(this.program, 'mModel');
         this.matViewUniformLocation = Main.gl.getUniformLocation(this.program, 'mView');
         this.matProjUniformLocation = Main.gl.getUniformLocation(this.program, 'mProj');
+        this.spritePosUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.pos');
+        this.spriteSizeUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.size');
         Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
         Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 32, 12);
         Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 32, 24);
@@ -213,37 +216,32 @@ class GameObject extends Apex {
         Main.gl.enableVertexAttribArray(this.texCoordAttribLocation);
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, null);
     }
-    update() {
-        super.update();
-    }
     doRender() {
         Main.gl.useProgram(this.program);
-        Main.gl.enable(Main.gl.DEPTH_TEST);
+        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
         Main.gl.uniformMatrix4fv(this.matModelUniformLocation, false, this.modelMatrix);
         Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, this.viewMatrix);
         Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, this.projectionMatrix);
-        Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
-        Main.gl.activeTexture(Main.gl.TEXTURE0);
+        if (this.baseTexture) {
+            Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
+            Main.gl.activeTexture(Main.gl.TEXTURE0);
+            Main.gl.uniform2f(this.spritePosUniformLocation, this.sprite.pos[0], this.sprite.pos[1]);
+            Main.gl.uniform2f(this.spriteSizeUniformLocation, this.sprite.size[0], this.sprite.size[1]);
+        }
         Main.gl.drawArrays(Main.gl.TRIANGLES, 0, Engine.modelLibrary.get(0 /* tank */).model.byteLength / 32);
     }
     useBaseColourTexture(type) {
+        if (type == -1 /* none */) {
+            return;
+        }
+        this.sprite = Engine.textureLibrary.getSprite(type);
         this.baseTexture = Main.gl.createTexture();
         Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
-        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.get(type));
-        Main.gl.bindTexture(Main.gl.TEXTURE_2D, null);
-    }
-    useNormalMapTexture(type) {
-        this.normalMap = Main.gl.createTexture();
-        Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.normalMap);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.CLAMP_TO_EDGE);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
-        Main.gl.texParameteri(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
-        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.get(type));
+        Main.gl.texParameterf(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_T, Main.gl.REPEAT);
+        Main.gl.texParameterf(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_WRAP_S, Main.gl.REPEAT);
+        Main.gl.texParameterf(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MIN_FILTER, Main.gl.LINEAR);
+        Main.gl.texParameterf(Main.gl.TEXTURE_2D, Main.gl.TEXTURE_MAG_FILTER, Main.gl.LINEAR);
+        Main.gl.texImage2D(Main.gl.TEXTURE_2D, 0, Main.gl.RGBA, Main.gl.RGBA, Main.gl.UNSIGNED_BYTE, Engine.textureLibrary.getTexture(this.sprite.textureType));
         Main.gl.bindTexture(Main.gl.TEXTURE_2D, null);
     }
 }
@@ -325,27 +323,37 @@ Model.parseFile = (fileContents) => {
 };
 class TextureLibrary {
     constructor() {
-        this.library = [];
+        this.texLibrary = [];
+        this.spriteLib = [];
     }
     Initialise() {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-            this.library[0 /* blueTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/player/tank_blue.png");
-            this.library[1 /* redTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/player/tank_red.png");
-            this.library[2 /* ashTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_ash.png");
-            this.library[3 /* blackTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_black.png");
-            this.library[4 /* brownTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_brown.png");
-            this.library[5 /* greenTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_green.png");
-            this.library[6 /* marinTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_marin.png");
-            this.library[7 /* pinkTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_pink.png");
-            this.library[8 /* purpleTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_purple.png");
-            this.library[9 /* violetTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_violet.png");
-            this.library[10 /* whiteTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_white.png");
-            this.library[11 /* yellowTank */] = yield ResourceLoader.loadImageResource("/src/Assets/Tanks/textures/enemy/tank_yellow.png");
+            this.texLibrary[0 /* bigSheet */] = yield ResourceLoader.loadImageResource("/src/Assets/Textures.png");
+            this.spriteLib[0 /* blueTank */] = { textureType: 0 /* bigSheet */, pos: [877, 1241], size: [32, 32] };
+            this.spriteLib[2 /* ashTank */] = { textureType: 0 /* bigSheet */, pos: [185, 1241], size: [32, 32] };
+            this.spriteLib[3 /* blackTank */] = { textureType: 0 /* bigSheet */, pos: [259, 1241], size: [32, 32] };
+            this.spriteLib[4 /* greenTank */] = { textureType: 0 /* bigSheet */, pos: [148, 1241], size: [32, 32] };
+            this.spriteLib[5 /* oliveTank */] = { textureType: 0 /* bigSheet */, pos: [790, 1241], size: [32, 32] };
+            this.spriteLib[6 /* marinTank */] = { textureType: 0 /* bigSheet */, pos: [221, 1241], size: [32, 32] };
+            this.spriteLib[7 /* pinkTank */] = { textureType: 0 /* bigSheet */, pos: [4, 1241], size: [32, 32] };
+            this.spriteLib[8 /* purpleTank */] = { textureType: 0 /* bigSheet */, pos: [927, 1172], size: [32, 32] };
+            this.spriteLib[9 /* violetTank */] = { textureType: 0 /* bigSheet */, pos: [444, 1241], size: [32, 32] };
+            this.spriteLib[10 /* whiteTank */] = { textureType: 0 /* bigSheet */, pos: [110, 1241], size: [32, 32] };
+            this.spriteLib[11 /* yellowTank */] = { textureType: 0 /* bigSheet */, pos: [816, 1241], size: [32, 32] };
+            for (var i in this.spriteLib) {
+                this.spriteLib[i].pos[0] /= this.getTexture(this.spriteLib[i].textureType).width;
+                this.spriteLib[i].pos[1] /= this.getTexture(this.spriteLib[i].textureType).height;
+                this.spriteLib[i].size[0] /= this.getTexture(this.spriteLib[i].textureType).width;
+                this.spriteLib[i].size[1] /= this.getTexture(this.spriteLib[i].textureType).height;
+            }
             resolve();
         }));
     }
-    get(type) {
-        return this.library[type];
+    getTexture(type) {
+        return this.texLibrary[type];
+    }
+    getSprite(type) {
+        return this.spriteLib[type];
     }
 }
 class ShaderLibrary {
@@ -475,13 +483,13 @@ class BoundingBox {
 class TankScene extends Scene {
     buildScene() {
         var bruh = new GameObject("Tank 1", 0 /* tank */);
-        bruh.useBaseColourTexture(2 /* ashTank */);
+        bruh.useBaseColourTexture(5 /* oliveTank */);
         mat4.lookAt(this.viewMatrix, [0, 0, -7], [0, 0, 0], [0, 1, 0]);
         mat4.perspective(this.projectionMatrix, Math.PI / 4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
         this.addChld(bruh);
     }
     doUpdate() {
         this.children[0].rotate(0.2, 0.2, 0.2);
-        this.children[0].uniformSetScale(3);
+        this.children[0].uniformSetScale(10);
     }
 }
