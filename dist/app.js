@@ -119,13 +119,15 @@ class Apex {
         this.doUpdate();
         for (let child of this.children) {
             child.parentModelMatrix = this._modelMatrix;
+            child.viewMatrix = this.viewMatrix;
+            child.projectionMatrix = this.projectionMatrix;
             child.update();
         }
     }
-    doRender(viewMatrix, projectionMatrix) { }
+    doRender() { }
     render() {
         if (this.toRender) {
-            this.doRender(this.viewMatrix, this.projectionMatrix);
+            this.doRender();
         }
         for (let child of this.children) {
             child.render();
@@ -214,12 +216,12 @@ class GameObject extends Apex {
     update() {
         super.update();
     }
-    doRender(viewMatrix, projectionMatrix) {
+    doRender() {
         Main.gl.useProgram(this.program);
         Main.gl.enable(Main.gl.DEPTH_TEST);
         Main.gl.uniformMatrix4fv(this.matModelUniformLocation, false, this.modelMatrix);
-        Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, viewMatrix);
-        Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, projectionMatrix);
+        Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, this.viewMatrix);
+        Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, this.projectionMatrix);
         Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
         Main.gl.activeTexture(Main.gl.TEXTURE0);
         Main.gl.drawArrays(Main.gl.TRIANGLES, 0, Engine.modelLibrary.get(0 /* tank */).model.byteLength / 32);

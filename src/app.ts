@@ -213,15 +213,18 @@ class Apex
         for (let child of this.children)
         {
             child.parentModelMatrix = this._modelMatrix
+            child.viewMatrix = this.viewMatrix
+            child.projectionMatrix = this.projectionMatrix
+
             child.update()
         }
     }
 
-    doRender(viewMatrix: any, projectionMatrix: any) { }
+    doRender() { }
 
     render()
     {
-        if (this.toRender) { this.doRender( this.viewMatrix, this.projectionMatrix) }
+        if (this.toRender) { this.doRender() }
 
         for (let child of this.children)
         {
@@ -371,13 +374,13 @@ class GameObject extends Apex
         super.update();
     }
 
-    doRender(viewMatrix: any, projectionMatrix: any): void {
+    doRender(): void {
         Main.gl.useProgram(this.program);
         Main.gl.enable(Main.gl.DEPTH_TEST);
 
         Main.gl.uniformMatrix4fv(this.matModelUniformLocation, false, this.modelMatrix);
-        Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, viewMatrix);
-        Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, projectionMatrix);
+        Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, this.viewMatrix);
+        Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, this.projectionMatrix);
 
         Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
         Main.gl.activeTexture(Main.gl.TEXTURE0);
@@ -719,7 +722,6 @@ class TankScene extends Scene
         bruh.useBaseColourTexture(TextureTypes.ashTank);
         mat4.lookAt(this.viewMatrix, [0, 0, -7], [0, 0, 0], [0, 1, 0]);
         mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
-
         this.addChld(bruh)
 
     }
@@ -727,6 +729,10 @@ class TankScene extends Scene
     doUpdate(): void {
         this.children[0].rotate(0.2,0.2,0.2);
         this.children[0].uniformSetScale(3);
+
+
+
+
     }
 
 }
