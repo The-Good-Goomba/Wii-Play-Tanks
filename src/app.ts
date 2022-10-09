@@ -21,12 +21,14 @@ const enum SpriteTypes
     purpleTank,
     violetTank,
     whiteTank,
-    yellowTank
+    yellowTank,
+    woodenFloor
 }
 
 const enum ModelTypes
 {
-    tank
+    tank,
+    plane
 }
 
 const enum VertexShaderTypes
@@ -333,14 +335,15 @@ class GameObject extends Apex
     
     modelBuffer!: WebGLBuffer;
     boundingBox!: BoundingBox;
+    bufferCount!: number;
 
     private baseTexture!: WebGLTexture;
     private sprite!: SpriteSheetInfo;
 
     private spritePosUniformLocation!: WebGLUniformLocation;
     private spriteSizeUniformLocation!: WebGLUniformLocation;
+    private samplerUniformLocation!: WebGLUniformLocation;
     
-
     private positionAttribLocation!: number;
     private texCoordAttribLocation!: number;
     private normalAttribLocation!: number;
@@ -356,6 +359,7 @@ class GameObject extends Apex
         this.program = ShaderLibrary.createProgram( VertexShaderTypes.default, FragmentShaderTypes.default)
 
         var mesh = Engine.modelLibrary.get(type);
+        this.bufferCount = mesh.model.byteLength / 32;
         this.boundingBox = mesh.boundingBox; 
 
         this.modelBuffer = Main.gl.createBuffer()!;
@@ -370,6 +374,7 @@ class GameObject extends Apex
         this.matViewUniformLocation = Main.gl.getUniformLocation(this.program, 'mView')!;
         this.matProjUniformLocation = Main.gl.getUniformLocation(this.program, 'mProj')!;
 
+        this.samplerUniformLocation = Main.gl.getUniformLocation(this.program, 'uSampler')!;
         this.spritePosUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.pos')!;
         this.spriteSizeUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.size')!;
 
@@ -396,16 +401,18 @@ class GameObject extends Apex
 
         if (this.baseTexture)
         {
-            Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
             Main.gl.activeTexture(Main.gl.TEXTURE0);
+            Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
+          
+            Main.gl.uniform1i(this.samplerUniformLocation, 0);
 
             Main.gl.uniform2f(this.spritePosUniformLocation, this.sprite.pos[0], this.sprite.pos[1]);
             Main.gl.uniform2f(this.spriteSizeUniformLocation, this.sprite.size[0], this.sprite.size[1]);
 
         }
         
-        Main.gl.drawArrays(Main.gl.TRIANGLES, 0 , Engine.modelLibrary.get(ModelTypes.tank).model.byteLength / 32);
-
+        Main.gl.drawArrays(Main.gl.TRIANGLES, 0 , this.bufferCount);
+        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, null);
     }
 
     useBaseColourTexture(type: SpriteTypes)
@@ -435,7 +442,8 @@ class ModelLibrary
     public Initialise()
     {
         return new Promise<void>(async (resolve, reject) => {
-            this.library[ModelTypes.tank] = await Model.getBinaryFromObj("/src/Assets/tankP.obj")
+            this.library[ModelTypes.tank] = await ModelLoader.getBinaryFromObj("/src/Assets/tankP.obj")
+            this.library[ModelTypes.plane] = await ModelLoader.getBinaryFromObj("/src/Assets/plane.obj")
             resolve();
         });   
     }
@@ -447,22 +455,18 @@ class ModelLibrary
 
 }
 
-class Mesh
+interface Mesh
 {
-    model!: ArrayBuffer;
-    boundingBox!: BoundingBox;
-    constructor(model: ArrayBuffer, bounds: BoundingBox) {
-        this.model = model;
-        this.boundingBox = bounds;
-    }
+    model: ArrayBuffer;
+    boundingBox: BoundingBox;
 }
 
-class Model
+class ModelLoader
 {
     static async getBinaryFromObj(url: string)
     {
-        const fileContents = await this.getFileContents(url);
-        const mesh = this.parseFile(fileContents);
+        const fileContents = await ModelLoader.getFileContents(url);
+        const mesh = ModelLoader.parseFile(fileContents);
         return mesh;
     }
 
@@ -505,17 +509,17 @@ class Model
         
             if (command === 'v')
             {
-                pos = this.stringsToNumbers(values) as [number, number, number];
+                pos = ModelLoader.stringsToNumbers(values) as [number, number, number];
                 boundingBox.updateBounds(pos);
                 positions.push(pos);
             }
             else if (command === 'vt')
             {
-                texCoords.push(this.stringsToNumbers(values));
+                texCoords.push(ModelLoader.stringsToNumbers(values));
             }
             else if (command === 'vn')
             {
-                normals.push(this.stringsToNumbers(values));
+                normals.push(ModelLoader.stringsToNumbers(values));
             }
 
             else if (command === 'f')
@@ -524,7 +528,7 @@ class Model
 
                 for (const group of values)
                 {
-                    const [ positionIndex, texCoordIndex, normalIndex] = this.stringsToNumbers(group.split('/'));
+                    const [ positionIndex, texCoordIndex, normalIndex] = ModelLoader.stringsToNumbers(group.split('/'));
 
                     arrayBufferSource.push(...positions[positionIndex - 1]);
                     arrayBufferSource.push(...normals[normalIndex - 1]);
@@ -535,11 +539,10 @@ class Model
 
         }
 
-        return new Mesh(new Float32Array(arrayBufferSource).buffer, boundingBox);
+        return { model: new Float32Array(arrayBufferSource).buffer, boundingBox: boundingBox };
     }   
 
 }
-
 
 class TextureLibrary
 {
@@ -562,6 +565,7 @@ class TextureLibrary
             this.spriteLib[SpriteTypes.violetTank] = { textureType: TextureTypes.bigSheet, pos: [444,1241], size: [32,32]}
             this.spriteLib[SpriteTypes.whiteTank] = { textureType: TextureTypes.bigSheet, pos: [110,1241], size: [32,32]}
             this.spriteLib[SpriteTypes.yellowTank] = { textureType: TextureTypes.bigSheet, pos: [816,1241], size: [32,32]}
+            this.spriteLib[SpriteTypes.woodenFloor] = { textureType: TextureTypes.bigSheet, pos: [4,4], size: [1024,512]}
 
             for (var i in this.spriteLib)
             {
@@ -748,23 +752,33 @@ class BoundingBox {
 class TankScene extends Scene
 {
 
+    tank1!: GameObject;
+    floor!: GameObject;
 
     buildScene()
     {
-        var bruh = new GameObject("Tank 1", ModelTypes.tank);
-        bruh.useBaseColourTexture(SpriteTypes.oliveTank);
 
-        mat4.lookAt(this.viewMatrix, [0, 0, -7], [0, 0, 0], [0, 1, 0]);
+        this.floor = new GameObject("Floor", ModelTypes.plane);
+        this.floor.useBaseColourTexture(SpriteTypes.woodenFloor)
+
+        this.tank1 = new GameObject("Tank 1", ModelTypes.tank);
+        this.tank1.useBaseColourTexture(SpriteTypes.oliveTank);
+
+       
+  
+        mat4.lookAt(this.viewMatrix, [0, 10, 15], [0, 0, 0], [0, 1, 0]);
         mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
-        this.addChld(bruh)
+
+        this.addChld(this.tank1);
+        this.addChld(this.floor);
+
+        console.log(this.floor.modelBuffer == this.tank1.modelBuffer);
+        
 
     }
 
     doUpdate(): void {
-        this.children[0].rotate(0.2,0.2,0.2);
-        this.children[0].uniformSetScale(10);
-
-
+        this.floor.uniformSetScale(10);
 
 
     }
