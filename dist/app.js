@@ -196,6 +196,7 @@ class GameObject extends Apex {
         this.normalMatrix = [];
         this.program = ShaderLibrary.createProgram(0 /* default */, 0 /* default */);
         var mesh = Engine.modelLibrary.get(type);
+        this.bufferCount = mesh.model.byteLength / 32;
         this.boundingBox = mesh.boundingBox;
         this.modelBuffer = Main.gl.createBuffer();
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
@@ -206,6 +207,7 @@ class GameObject extends Apex {
         this.matModelUniformLocation = Main.gl.getUniformLocation(this.program, 'mModel');
         this.matViewUniformLocation = Main.gl.getUniformLocation(this.program, 'mView');
         this.matProjUniformLocation = Main.gl.getUniformLocation(this.program, 'mProj');
+        this.samplerUniformLocation = Main.gl.getUniformLocation(this.program, 'uSampler');
         this.spritePosUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.pos');
         this.spriteSizeUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.size');
         Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
@@ -223,12 +225,14 @@ class GameObject extends Apex {
         Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, this.viewMatrix);
         Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, this.projectionMatrix);
         if (this.baseTexture) {
-            Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
             Main.gl.activeTexture(Main.gl.TEXTURE0);
+            Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
+            Main.gl.uniform1i(this.samplerUniformLocation, 0);
             Main.gl.uniform2f(this.spritePosUniformLocation, this.sprite.pos[0], this.sprite.pos[1]);
             Main.gl.uniform2f(this.spriteSizeUniformLocation, this.sprite.size[0], this.sprite.size[1]);
         }
-        Main.gl.drawArrays(Main.gl.TRIANGLES, 0, Engine.modelLibrary.get(0 /* tank */).model.byteLength / 32);
+        Main.gl.drawArrays(Main.gl.TRIANGLES, 0, this.bufferCount);
+        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, null);
     }
     useBaseColourTexture(type) {
         if (type == -1 /* none */) {
@@ -251,7 +255,8 @@ class ModelLibrary {
     }
     Initialise() {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-            this.library[0 /* tank */] = yield Model.getBinaryFromObj("/src/Assets/tankP.obj");
+            this.library[0 /* tank */] = yield ModelLoader.getBinaryFromObj("/src/Assets/tankP.obj");
+            this.library[1 /* plane */] = yield ModelLoader.getBinaryFromObj("/src/Assets/plane.obj");
             resolve();
         }));
     }
@@ -259,35 +264,29 @@ class ModelLibrary {
         return this.library[type];
     }
 }
-class Mesh {
-    constructor(model, bounds) {
-        this.model = model;
-        this.boundingBox = bounds;
-    }
-}
-class Model {
+class ModelLoader {
     static getBinaryFromObj(url) {
         return __awaiter(this, void 0, void 0, function* () {
-            const fileContents = yield this.getFileContents(url);
-            const mesh = this.parseFile(fileContents);
+            const fileContents = yield ModelLoader.getFileContents(url);
+            const mesh = ModelLoader.parseFile(fileContents);
             return mesh;
         });
     }
 }
-_a = Model;
-Model.getFileContents = (filename) => __awaiter(void 0, void 0, void 0, function* () {
+_a = ModelLoader;
+ModelLoader.getFileContents = (filename) => __awaiter(void 0, void 0, void 0, function* () {
     const file = yield fetch(filename);
     const body = yield file.text();
     return body;
 });
-Model.stringsToNumbers = (strings) => {
+ModelLoader.stringsToNumbers = (strings) => {
     const numbers = [];
     for (const str of strings) {
         numbers.push(parseFloat(str));
     }
     return numbers;
 };
-Model.parseFile = (fileContents) => {
+ModelLoader.parseFile = (fileContents) => {
     const positions = [];
     const texCoords = [];
     const normals = [];
@@ -299,27 +298,27 @@ Model.parseFile = (fileContents) => {
     for (const line of lines) {
         const [command, ...values] = line.split(' ', 4);
         if (command === 'v') {
-            pos = _a.stringsToNumbers(values);
+            pos = ModelLoader.stringsToNumbers(values);
             boundingBox.updateBounds(pos);
             positions.push(pos);
         }
         else if (command === 'vt') {
-            texCoords.push(_a.stringsToNumbers(values));
+            texCoords.push(ModelLoader.stringsToNumbers(values));
         }
         else if (command === 'vn') {
-            normals.push(_a.stringsToNumbers(values));
+            normals.push(ModelLoader.stringsToNumbers(values));
         }
         else if (command === 'f') {
             faceCount += 1;
             for (const group of values) {
-                const [positionIndex, texCoordIndex, normalIndex] = _a.stringsToNumbers(group.split('/'));
+                const [positionIndex, texCoordIndex, normalIndex] = ModelLoader.stringsToNumbers(group.split('/'));
                 arrayBufferSource.push(...positions[positionIndex - 1]);
                 arrayBufferSource.push(...normals[normalIndex - 1]);
                 arrayBufferSource.push(...texCoords[texCoordIndex - 1]);
             }
         }
     }
-    return new Mesh(new Float32Array(arrayBufferSource).buffer, boundingBox);
+    return { model: new Float32Array(arrayBufferSource).buffer, boundingBox: boundingBox };
 };
 class TextureLibrary {
     constructor() {
@@ -340,6 +339,7 @@ class TextureLibrary {
             this.spriteLib[9 /* violetTank */] = { textureType: 0 /* bigSheet */, pos: [444, 1241], size: [32, 32] };
             this.spriteLib[10 /* whiteTank */] = { textureType: 0 /* bigSheet */, pos: [110, 1241], size: [32, 32] };
             this.spriteLib[11 /* yellowTank */] = { textureType: 0 /* bigSheet */, pos: [816, 1241], size: [32, 32] };
+            this.spriteLib[12 /* woodenFloor */] = { textureType: 0 /* bigSheet */, pos: [4, 4], size: [1024, 512] };
             for (var i in this.spriteLib) {
                 this.spriteLib[i].pos[0] /= this.getTexture(this.spriteLib[i].textureType).width;
                 this.spriteLib[i].pos[1] /= this.getTexture(this.spriteLib[i].textureType).height;
@@ -482,14 +482,17 @@ class BoundingBox {
 }
 class TankScene extends Scene {
     buildScene() {
-        var bruh = new GameObject("Tank 1", 0 /* tank */);
-        bruh.useBaseColourTexture(5 /* oliveTank */);
-        mat4.lookAt(this.viewMatrix, [0, 0, -7], [0, 0, 0], [0, 1, 0]);
+        this.floor = new GameObject("Floor", 1 /* plane */);
+        this.floor.useBaseColourTexture(12 /* woodenFloor */);
+        this.tank1 = new GameObject("Tank 1", 0 /* tank */);
+        this.tank1.useBaseColourTexture(5 /* oliveTank */);
+        mat4.lookAt(this.viewMatrix, [0, 10, 15], [0, 0, 0], [0, 1, 0]);
         mat4.perspective(this.projectionMatrix, Math.PI / 4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
-        this.addChld(bruh);
+        this.addChld(this.tank1);
+        this.addChld(this.floor);
+        console.log(this.floor.modelBuffer == this.tank1.modelBuffer);
     }
     doUpdate() {
-        this.children[0].rotate(0.2, 0.2, 0.2);
-        this.children[0].uniformSetScale(10);
+        this.floor.uniformSetScale(10);
     }
 }
