@@ -382,13 +382,6 @@ class GameObject extends Apex
         Main.gl.bufferData(Main.gl.ARRAY_BUFFER, mesh.model, Main.gl.STATIC_DRAW);
 
 
-        Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
-        Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 32, 12);
-        Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 32, 24);
-        Main.gl.enableVertexAttribArray(this.positionAttribLocation);
-        Main.gl.enableVertexAttribArray(this.normalAttribLocation);
-        Main.gl.enableVertexAttribArray(this.texCoordAttribLocation);
-
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, null);
 
     }
@@ -397,6 +390,13 @@ class GameObject extends Apex
         Main.gl.useProgram(this.program);
         
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
+
+        Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
+        Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 32, 12);
+        Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 32, 24);
+        Main.gl.enableVertexAttribArray(this.positionAttribLocation);
+        Main.gl.enableVertexAttribArray(this.normalAttribLocation);
+        Main.gl.enableVertexAttribArray(this.texCoordAttribLocation);
 
         Main.gl.uniformMatrix4fv(this.matModelUniformLocation, false, this.modelMatrix);
         Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, this.viewMatrix);
