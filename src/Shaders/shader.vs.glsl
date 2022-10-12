@@ -7,12 +7,11 @@ struct SpriteSheetInfo
     vec2 size;
 };
 
-uniform SpriteSheetInfo spriteInfo;
 
-layout(location=0) in vec3 vertPosition;
-layout(location=1) in vec3 vertNormal;
-layout(location=2) in vec2 vertTexCoord;
 
+in vec3 vertPosition;
+in vec3 vertNormal;
+in vec2 vertTexCoord;
 
 out vec2 fragTexCoord;
 out vec3 fragNormal;
@@ -20,6 +19,7 @@ out vec3 fragNormal;
 uniform mat4 mModel;
 uniform mat4 mView;
 uniform mat4 mProj;
+uniform SpriteSheetInfo spriteInfo;
 
 void main() {
     fragTexCoord = vertTexCoord * spriteInfo.size + spriteInfo.pos;

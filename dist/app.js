@@ -195,21 +195,21 @@ class GameObject extends Apex {
         super(name);
         this.normalMatrix = [];
         this.program = ShaderLibrary.createProgram(0 /* default */, 0 /* default */);
-        var mesh = Engine.modelLibrary.get(type);
-        this.bufferCount = mesh.model.byteLength / 32;
-        this.boundingBox = mesh.boundingBox;
-        this.modelBuffer = Main.gl.createBuffer();
-        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
-        Main.gl.bufferData(Main.gl.ARRAY_BUFFER, mesh.model, Main.gl.STATIC_DRAW);
         this.positionAttribLocation = Main.gl.getAttribLocation(this.program, 'vertPosition');
-        this.texCoordAttribLocation = Main.gl.getAttribLocation(this.program, 'vertTexCoord');
         this.normalAttribLocation = Main.gl.getAttribLocation(this.program, 'vertNormal');
+        this.texCoordAttribLocation = Main.gl.getAttribLocation(this.program, 'vertTexCoord');
         this.matModelUniformLocation = Main.gl.getUniformLocation(this.program, 'mModel');
         this.matViewUniformLocation = Main.gl.getUniformLocation(this.program, 'mView');
         this.matProjUniformLocation = Main.gl.getUniformLocation(this.program, 'mProj');
         this.samplerUniformLocation = Main.gl.getUniformLocation(this.program, 'uSampler');
         this.spritePosUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.pos');
         this.spriteSizeUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.size');
+        var mesh = Engine.modelLibrary.get(type);
+        this.bufferCount = mesh.model.byteLength / 32;
+        this.boundingBox = mesh.boundingBox;
+        this.modelBuffer = Main.gl.createBuffer();
+        Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
+        Main.gl.bufferData(Main.gl.ARRAY_BUFFER, mesh.model, Main.gl.STATIC_DRAW);
         Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
         Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 32, 12);
         Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 32, 24);
@@ -291,7 +291,6 @@ ModelLoader.parseFile = (fileContents) => {
     const texCoords = [];
     const normals = [];
     const arrayBufferSource = [];
-    var faceCount = 0;
     var boundingBox = new BoundingBox([Infinity, Infinity, Infinity], [-Infinity, -Infinity, -Infinity]);
     const lines = fileContents.split('\n');
     var pos = [0, 0, 0];
@@ -309,7 +308,6 @@ ModelLoader.parseFile = (fileContents) => {
             normals.push(ModelLoader.stringsToNumbers(values));
         }
         else if (command === 'f') {
-            faceCount += 1;
             for (const group of values) {
                 const [positionIndex, texCoordIndex, normalIndex] = ModelLoader.stringsToNumbers(group.split('/'));
                 arrayBufferSource.push(...positions[positionIndex - 1]);
@@ -318,7 +316,8 @@ ModelLoader.parseFile = (fileContents) => {
             }
         }
     }
-    return { model: new Float32Array(arrayBufferSource).buffer, boundingBox: boundingBox };
+    var mod = new Float32Array(arrayBufferSource).buffer;
+    return { model: mod, boundingBox: boundingBox };
 };
 class TextureLibrary {
     constructor() {
@@ -482,17 +481,18 @@ class BoundingBox {
 }
 class TankScene extends Scene {
     buildScene() {
+        this.tank1 = new GameObject("Tank 1", 0 /* tank */);
+        this.tank1.useBaseColourTexture(2 /* ashTank */);
         this.floor = new GameObject("Floor", 1 /* plane */);
         this.floor.useBaseColourTexture(12 /* woodenFloor */);
-        this.tank1 = new GameObject("Tank 1", 0 /* tank */);
-        this.tank1.useBaseColourTexture(5 /* oliveTank */);
         mat4.lookAt(this.viewMatrix, [0, 10, 15], [0, 0, 0], [0, 1, 0]);
         mat4.perspective(this.projectionMatrix, Math.PI / 4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
-        this.addChld(this.tank1);
-        this.addChld(this.floor);
-        console.log(this.floor.modelBuffer == this.tank1.modelBuffer);
+        this.children[0] = this.tank1;
+        this.children[1] = this.floor;
+        this.tank1.uniformSetScale(10);
+        this.floor.uniformSetScale(10);
+        this.tank1.setPositionY(5);
     }
     doUpdate() {
-        this.floor.uniformSetScale(10);
     }
 }
