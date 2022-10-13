@@ -194,10 +194,15 @@ class GameObject extends Apex {
     constructor(name, type) {
         super(name);
         this.normalMatrix = [];
+        this.jointMatrices = [];
+        for (var i = 0; i < 4; i++) {
+            this.jointMatrices[i] = mat4.create();
+        }
         this.program = ShaderLibrary.createProgram(0 /* default */, 0 /* default */);
         this.positionAttribLocation = Main.gl.getAttribLocation(this.program, 'vertPosition');
         this.normalAttribLocation = Main.gl.getAttribLocation(this.program, 'vertNormal');
         this.texCoordAttribLocation = Main.gl.getAttribLocation(this.program, 'vertTexCoord');
+        this.meshMemberAttribLocation = Main.gl.getAttribLocation(this.program, 'meshMember');
         this.matModelUniformLocation = Main.gl.getUniformLocation(this.program, 'mModel');
         this.matViewUniformLocation = Main.gl.getUniformLocation(this.program, 'mView');
         this.matProjUniformLocation = Main.gl.getUniformLocation(this.program, 'mProj');
@@ -205,7 +210,7 @@ class GameObject extends Apex {
         this.spritePosUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.pos');
         this.spriteSizeUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.size');
         var mesh = Engine.modelLibrary.get(type);
-        this.bufferCount = mesh.model.byteLength / 32;
+        this.bufferCount = mesh.model.byteLength / 36;
         this.boundingBox = mesh.boundingBox;
         this.modelBuffer = Main.gl.createBuffer();
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
@@ -215,21 +220,26 @@ class GameObject extends Apex {
     doRender() {
         Main.gl.useProgram(this.program);
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
-        Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
-        Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 32, 12);
-        Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 32, 24);
+        Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 36, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
+        Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 36, 12);
+        Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 36, 24);
+        Main.gl.vertexAttribPointer(this.meshMemberAttribLocation, 1, Main.gl.FLOAT, false, 36, 32);
         Main.gl.enableVertexAttribArray(this.positionAttribLocation);
         Main.gl.enableVertexAttribArray(this.normalAttribLocation);
         Main.gl.enableVertexAttribArray(this.texCoordAttribLocation);
+        Main.gl.enableVertexAttribArray(this.meshMemberAttribLocation);
         Main.gl.uniformMatrix4fv(this.matModelUniformLocation, false, this.modelMatrix);
         Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, this.viewMatrix);
         Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, this.projectionMatrix);
+        for (var i = 0; i < this.jointMatrices.length; i++) {
+            Main.gl.uniformMatrix4fv(Main.gl.getUniformLocation(this.program, `jointMatrices[${i}]`), false, this.jointMatrices[i]);
+        }
         if (this.baseTexture) {
             Main.gl.activeTexture(Main.gl.TEXTURE0);
             Main.gl.bindTexture(Main.gl.TEXTURE_2D, this.baseTexture);
             Main.gl.uniform1i(this.samplerUniformLocation, 0);
-            Main.gl.uniform2f(this.spritePosUniformLocation, this.sprite.pos[0], this.sprite.pos[1]);
-            Main.gl.uniform2f(this.spriteSizeUniformLocation, this.sprite.size[0], this.sprite.size[1]);
+            Main.gl.uniform2fv(this.spritePosUniformLocation, this.sprite.pos);
+            Main.gl.uniform2fv(this.spriteSizeUniformLocation, this.sprite.size);
         }
         Main.gl.drawArrays(Main.gl.TRIANGLES, 0, this.bufferCount);
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, null);
@@ -294,8 +304,23 @@ ModelLoader.parseFile = (fileContents) => {
     var boundingBox = new BoundingBox([Infinity, Infinity, Infinity], [-Infinity, -Infinity, -Infinity]);
     const lines = fileContents.split('\n');
     var pos = [0, 0, 0];
+    var meshMember = [];
+    var currentMember = 0;
     for (const line of lines) {
         const [command, ...values] = line.split(' ', 4);
+        if (command === 'g') {
+            var bruh = true;
+            for (let i = 0; i < meshMember.length; i++) {
+                if (values[0] == meshMember[i]) {
+                    currentMember = i;
+                    bruh = false;
+                }
+            }
+            if (bruh) {
+                currentMember = meshMember.length;
+                meshMember.push(values[0]);
+            }
+        }
         if (command === 'v') {
             pos = ModelLoader.stringsToNumbers(values);
             boundingBox.updateBounds(pos);
@@ -313,6 +338,7 @@ ModelLoader.parseFile = (fileContents) => {
                 arrayBufferSource.push(...positions[positionIndex - 1]);
                 arrayBufferSource.push(...normals[normalIndex - 1]);
                 arrayBufferSource.push(...texCoords[texCoordIndex - 1]);
+                arrayBufferSource.push(currentMember);
             }
         }
     }
@@ -481,7 +507,7 @@ class BoundingBox {
 }
 class TankScene extends Scene {
     buildScene() {
-        this.tank1 = new GameObject("Tank 1", 0 /* tank */);
+        this.tank1 = new Tank();
         this.tank1.useBaseColourTexture(2 /* ashTank */);
         this.floor = new GameObject("Floor", 1 /* plane */);
         this.floor.useBaseColourTexture(12 /* woodenFloor */);
@@ -494,5 +520,10 @@ class TankScene extends Scene {
         this.tank1.setPositionY(5);
     }
     doUpdate() {
+    }
+}
+class Tank extends GameObject {
+    constructor() {
+        super("tank", 0 /* tank */);
     }
 }

@@ -1,6 +1,14 @@
 declare var glMatrix: any;
 const { mat4 , vec3, quat } = glMatrix;
 
+type matrix4x4 = [number, number, number, number,
+    number, number, number, number,
+    number, number, number, number,
+    number, number, number, number];
+
+type SIMD2<bruh> = [ bruh, bruh ];
+type SIMD3<bruh> = [ bruh, bruh, bruh ];
+
 const enum TextureTypes
 {
     none = -1,
@@ -339,30 +347,41 @@ class GameObject extends Apex
 
     type!: ModelTypes;
 
+    jointMatrices: matrix4x4[] = []
+
     private baseTexture!: WebGLTexture;
     private sprite!: SpriteSheetInfo;
 
     private spritePosUniformLocation!: WebGLUniformLocation;
     private spriteSizeUniformLocation!: WebGLUniformLocation;
     private samplerUniformLocation!: WebGLUniformLocation;
-    
-    private positionAttribLocation!: number;
-    private texCoordAttribLocation!: number;
-    private normalAttribLocation!: number;
 
     private matModelUniformLocation!: WebGLUniformLocation;
     private matProjUniformLocation!: WebGLUniformLocation;
     private matViewUniformLocation!: WebGLUniformLocation;
+    
+    private positionAttribLocation!: number;
+    private texCoordAttribLocation!: number;
+    private normalAttribLocation!: number;
+    private meshMemberAttribLocation!: number;
+
+ 
 
     constructor(name: string, type: ModelTypes)
     {
         super(name);
+        for(var i = 0; i < 4; i++)
+        {
+            this.jointMatrices[i] = mat4.create();
+        }
+        
         
         this.program = ShaderLibrary.createProgram( VertexShaderTypes.default, FragmentShaderTypes.default );
 
         this.positionAttribLocation = Main.gl.getAttribLocation(this.program, 'vertPosition');
         this.normalAttribLocation = Main.gl.getAttribLocation(this.program, 'vertNormal');
         this.texCoordAttribLocation = Main.gl.getAttribLocation(this.program, 'vertTexCoord');
+        this.meshMemberAttribLocation = Main.gl.getAttribLocation(this.program, 'meshMember');
         
 
         this.matModelUniformLocation = Main.gl.getUniformLocation(this.program, 'mModel')!;
@@ -374,13 +393,12 @@ class GameObject extends Apex
         this.spriteSizeUniformLocation = Main.gl.getUniformLocation(this.program, 'spriteInfo.size')!;
 
         var mesh = Engine.modelLibrary.get(type);
-        this.bufferCount = mesh.model.byteLength / 32;
+        this.bufferCount = mesh.model.byteLength / 36;
         this.boundingBox = mesh.boundingBox; 
 
         this.modelBuffer = Main.gl.createBuffer()!;
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
         Main.gl.bufferData(Main.gl.ARRAY_BUFFER, mesh.model, Main.gl.STATIC_DRAW);
-
 
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, null);
 
@@ -391,16 +409,26 @@ class GameObject extends Apex
         
         Main.gl.bindBuffer(Main.gl.ARRAY_BUFFER, this.modelBuffer);
 
-        Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 32, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
-        Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 32, 12);
-        Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 32, 24);
+        Main.gl.vertexAttribPointer(this.positionAttribLocation, 3, Main.gl.FLOAT, false, 36, 0); // Magic numbers!! (No idea what they are but it wasn't working before)
+        Main.gl.vertexAttribPointer(this.normalAttribLocation, 3, Main.gl.FLOAT, false, 36, 12);
+        Main.gl.vertexAttribPointer(this.texCoordAttribLocation, 2, Main.gl.FLOAT, false, 36, 24);
+        Main.gl.vertexAttribPointer(this.meshMemberAttribLocation, 1, Main.gl.FLOAT, false, 36, 32);
+
         Main.gl.enableVertexAttribArray(this.positionAttribLocation);
         Main.gl.enableVertexAttribArray(this.normalAttribLocation);
         Main.gl.enableVertexAttribArray(this.texCoordAttribLocation);
+        Main.gl.enableVertexAttribArray(this.meshMemberAttribLocation);
 
         Main.gl.uniformMatrix4fv(this.matModelUniformLocation, false, this.modelMatrix);
         Main.gl.uniformMatrix4fv(this.matViewUniformLocation, false, this.viewMatrix);
         Main.gl.uniformMatrix4fv(this.matProjUniformLocation, false, this.projectionMatrix);
+        for(var i = 0; i < this.jointMatrices.length; i++)
+        {
+            Main.gl.uniformMatrix4fv(Main.gl.getUniformLocation(this.program, `jointMatrices[${i}]`), false, this.jointMatrices[i]);
+        }
+        
+
+
 
         if (this.baseTexture)
         {
@@ -409,8 +437,8 @@ class GameObject extends Apex
           
             Main.gl.uniform1i(this.samplerUniformLocation, 0);
 
-            Main.gl.uniform2f(this.spritePosUniformLocation, this.sprite.pos[0], this.sprite.pos[1]);
-            Main.gl.uniform2f(this.spriteSizeUniformLocation, this.sprite.size[0], this.sprite.size[1]);
+            Main.gl.uniform2fv(this.spritePosUniformLocation, this.sprite.pos);
+            Main.gl.uniform2fv(this.spriteSizeUniformLocation, this.sprite.size);
 
         }
         
@@ -503,14 +531,26 @@ class ModelLoader
         )
 
         const lines = fileContents.split('\n');
-        var pos: [number, number, number] = [0,0,0];
+        var pos: SIMD3<number> = [0,0,0];
+        var meshMember: string[] = [];
+        var currentMember: number = 0;
         for(const line of lines)
         {
             const [ command, ...values] = line.split(' ', 4);
+
+            if (command === 'g')
+            {
+                var bruh = true;
+                for (let i = 0;i < meshMember.length; i++)
+                {
+                    if ( values[0] == meshMember[i]) { currentMember = i; bruh = false }
+                }
+                if (bruh) { currentMember = meshMember.length; meshMember.push(values[0]);}
+            }
         
             if (command === 'v')
             {
-                pos = ModelLoader.stringsToNumbers(values) as [number, number, number];
+                pos = ModelLoader.stringsToNumbers(values) as SIMD3<number>;
                 boundingBox.updateBounds(pos);
                 positions.push(pos);
             }
@@ -533,7 +573,7 @@ class ModelLoader
                     arrayBufferSource.push(...positions[positionIndex - 1]);
                     arrayBufferSource.push(...normals[normalIndex - 1]);
                     arrayBufferSource.push(...texCoords[texCoordIndex - 1]);
-                    
+                    arrayBufferSource.push(currentMember);
                 }
             }
 
@@ -598,8 +638,8 @@ class TextureLibrary
 interface SpriteSheetInfo
 {
     textureType: TextureTypes;
-    pos: [number, number];
-    size: [number, number];
+    pos: SIMD2<number>;
+    size: SIMD2<number>;
 }
 
 class ShaderLibrary
@@ -711,10 +751,10 @@ class ResourceLoader
 }
 
 class BoundingBox {
-    maxBounds!: [number, number, number];
-    minBounds!: [number, number, number];
+    maxBounds!: SIMD3<number>;
+    minBounds!: SIMD3<number>;
 
-    constructor(min: [number, number, number] = [0,0,0], max: [number, number, number] = [0,0,0])
+    constructor(min: SIMD3<number> = [0,0,0], max: SIMD3<number> = [0,0,0])
     {
         this.minBounds = min;
         this.maxBounds = max;
@@ -728,7 +768,7 @@ class BoundingBox {
     scaleHeightTo(high: number): number { return high / this.height }
     scaleDepthTo(deep: number): number { return deep / this.depth }
 
-    getScaledBounds(scale: [number, number, number])
+    getScaledBounds(scale: SIMD3<number>)
     {
         var box = new BoundingBox
         box.minBounds =  [this.minBounds[0] * scale[0] ,this.minBounds[1] * scale[1] , this.minBounds[2] * scale[2]]
@@ -736,7 +776,7 @@ class BoundingBox {
         return box
     }
 
-    updateBounds(pos: [number, number, number])
+    updateBounds(pos: SIMD3<number>)
     {
         //        Max bounds
         if (pos[1] > this.maxBounds[1]) { this.maxBounds[1] = pos[1] }
@@ -754,12 +794,12 @@ class BoundingBox {
 class TankScene extends Scene
 {
 
-    tank1!: GameObject;
+    tank1!: Tank;
     floor!: GameObject;
 
     buildScene()
     {
-        this.tank1 = new GameObject("Tank 1", ModelTypes.tank);
+        this.tank1 = new Tank();
         this.tank1.useBaseColourTexture(SpriteTypes.ashTank);
 
         this.floor = new GameObject("Floor", ModelTypes.plane);
@@ -781,5 +821,16 @@ class TankScene extends Scene
     doUpdate(): void {
 
     }
+
+}
+
+class Tank extends GameObject
+{
+
+    constructor()
+    {
+        super("tank", ModelTypes.tank);
+    }
+
 
 }
