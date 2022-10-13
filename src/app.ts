@@ -64,12 +64,24 @@ class Main
 {
     static gl: WebGL2RenderingContext;
     static canvas: HTMLCanvasElement;
+    private static _mousePos: SIMD2<number> = [0, 0];
+
+    static get mousePos() {
+        return this._mousePos;
+    }
+
+    static updateMousePos(event: MouseEvent) {
+        Main._mousePos[0] = event.offsetX;
+        Main._mousePos[1] = event.offsetY;
+    }
 
     static InitApp() {
 
         Main.canvas = document.getElementById('game-surface') as HTMLCanvasElement;
 
         Main.gl = Main.canvas.getContext('webgl2') as WebGL2RenderingContext;
+
+        Main.canvas.onmousemove = function(event) { Main.updateMousePos(event); }
     
         if (!Main.gl) {
             alert('Your browser does not support WebGL');
@@ -99,6 +111,7 @@ class Main
         {
             Main.gl.clearColor(0.75, 0.85, 0.8, 1.0);
             Main.gl.clear(Main.gl.COLOR_BUFFER_BIT | Main.gl.DEPTH_BUFFER_BIT);
+
             SceneManager.doUpdate();
             requestAnimationFrame(loop);
         }
@@ -819,7 +832,6 @@ class TankScene extends Scene
     }
 
     doUpdate(): void {
-
     }
 
 }
@@ -831,6 +843,18 @@ class Tank extends GameObject
     {
         super("tank", ModelTypes.tank);
     }
+
+    doUpdate(): void {
+        this.updateTurretRotation();
+    }
+
+    updateTurretRotation()
+    {
+        var rot = Math.atan((Main.mousePos[1] - Main.canvas.width / 2) / (Main.mousePos[0] - Main.canvas.height / 2));
+        mat4.fromRotation(this.jointMatrices[1], rot, [0,1,0]);
+    }
+
+
 
 
 }

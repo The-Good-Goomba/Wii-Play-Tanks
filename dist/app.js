@@ -14,9 +14,17 @@ var start = function () {
     Main.InitApp();
 };
 class Main {
+    static get mousePos() {
+        return this._mousePos;
+    }
+    static updateMousePos(event) {
+        Main._mousePos[0] = event.offsetX;
+        Main._mousePos[1] = event.offsetY;
+    }
     static InitApp() {
         Main.canvas = document.getElementById('game-surface');
         Main.gl = Main.canvas.getContext('webgl2');
+        Main.canvas.onmousemove = function (event) { Main.updateMousePos(event); };
         if (!Main.gl) {
             alert('Your browser does not support WebGL');
         }
@@ -44,6 +52,7 @@ class Main {
         requestAnimationFrame(loop);
     }
 }
+Main._mousePos = [0, 0];
 class SceneManager {
     static Initialise(type) {
         SceneManager.setScene(type);
@@ -525,5 +534,12 @@ class TankScene extends Scene {
 class Tank extends GameObject {
     constructor() {
         super("tank", 0 /* tank */);
+    }
+    doUpdate() {
+        this.updateTurretRotation();
+    }
+    updateTurretRotation() {
+        var rot = Math.atan((Main.mousePos[1] - Main.canvas.width / 2) / (Main.mousePos[0] - Main.canvas.height / 2));
+        mat4.fromRotation(this.jointMatrices[1], rot, [0, 1, 0]);
     }
 }
