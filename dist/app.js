@@ -18,6 +18,7 @@ const normalise2 = (v) => {
     const length = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
     return [v[0] / length, v[1] / length];
 };
+const toDegrees = (radians) => radians * 180 / Math.PI;
 var start = function () {
     Main.InitApp();
 };
@@ -194,7 +195,7 @@ class Apex {
     getPositionZ() { return this.position[2]; }
     setRotation(x, y, z) {
         this.rotation = [x, y, z];
-        quat.fromEuler(this.quaternion, x, y, z);
+        quat.fromEuler(this.quaternion, toDegrees(x), toDegrees(y), toDegrees(z));
         this.updateModelMatrix();
         this.afterRotation();
     }
@@ -555,11 +556,11 @@ class TankScene extends Scene {
         this.floor = new GameObject("Floor", 1 /* plane */);
         this.floor.useBaseColourTexture(12 /* woodenFloor */);
         mat4.lookAt(this.viewMatrix, [0, 10, 10], [0, 0, 0], normalise3([0, 5, -1]));
-        // mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
-        mat4.ortho(this.projectionMatrix, -10, 10, -7, 7, 0.1, 100.0);
+        mat4.perspective(this.projectionMatrix, Math.PI / 4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
+        // mat4.ortho(this.projectionMatrix, -10, 10, -7, 7, 0.1, 100.0);
         this.children[0] = this.tank1;
         this.children[1] = this.floor;
-        this.tank1.tankBody.uniformSetScale(10);
+        this.tank1.tankBody.uniformSetScale(5);
         this.floor.uniformSetScale(10);
     }
     doUpdate() {
@@ -600,8 +601,12 @@ class Tank extends Apex {
         this.updateTurretRotation();
     }
     shoot(dir = [0, 1]) {
-        var bullet = new Bullet(normalise2(dir), this.getPosition());
-        // bullet.uniformSetScale(this.tankBody.getScale()[0]);
+        const cannonLength = this.tankBody.getScaleX() * 0.16;
+        var dire = normalise2([(Mouse.mousePos[0] - this.screenCoords[0]), (Mouse.mousePos[1] - this.screenCoords[1])]);
+        var bullet = new Bullet(dire, [this.getPositionX() + cannonLength * dire[0],
+            this.getPositionY() + this.tankBody.getScaleX() * 0.1,
+            this.getPositionZ() + cannonLength * dire[1]]);
+        bullet.uniformSetScale(this.tankBody.getScale()[0] * 0.007);
         this.addChld(bullet);
     }
     moveUp() {
@@ -628,13 +633,15 @@ class Tank extends Apex {
     }
 }
 class Bullet extends GameObject {
-    constructor(dir, pos = [0, 0, 0]) {
+    constructor(dir, pos) {
         super("bullet", 2 /* shell */);
         this.speed = 0.1;
         this.bouncesLeft = 1;
         this.setPosition(pos[0], pos[1], pos[2]);
         this.useBaseColourTexture(13 /* shell */);
         this.direction = dir;
+        let bruh = Math.atan2(dir[1], dir[0]);
+        this.setRotationY(-(bruh - Math.PI / 2));
     }
     doUpdate() {
         this.move(this.direction[0] * this.speed, 0, this.direction[1] * this.speed);

@@ -21,6 +21,8 @@ const normalise2 = (v: SIMD2<number>): SIMD2<number> =>
     return [v[0] / length, v[1] / length];
 }
 
+const toDegrees = (radians: number) => radians * 180 / Math.PI;
+
 const enum TextureTypes
 {
     none = -1,
@@ -243,7 +245,7 @@ class Apex
     viewMatrix = new Float32Array(16);
     projectionMatrix = new Float32Array(16);
 
-    private _modelMatrix = new Float32Array(16);
+    _modelMatrix = new Float32Array(16);
 
     children: Apex[] = []; // Array of Apex 's
 
@@ -339,7 +341,7 @@ class Apex
     {
         this.rotation = [x,y,z]
         
-        quat.fromEuler(this.quaternion, x, y, z);
+        quat.fromEuler(this.quaternion, toDegrees(x), toDegrees(y), toDegrees(z));
         
         this.updateModelMatrix()
         this.afterRotation()
@@ -868,13 +870,13 @@ class TankScene extends Scene
         this.floor.useBaseColourTexture(SpriteTypes.woodenFloor);
 
         mat4.lookAt(this.viewMatrix, [0, 10, 10], [0, 0, 0], normalise3([0,5,-1]));
-        // mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
-        mat4.ortho(this.projectionMatrix, -10, 10, -7, 7, 0.1, 100.0);
+        mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
+        // mat4.ortho(this.projectionMatrix, -10, 10, -7, 7, 0.1, 100.0);
 
         this.children[0] = this.tank1;
         this.children[1] = this.floor;
 
-        this.tank1.tankBody.uniformSetScale(10);
+        this.tank1.tankBody.uniformSetScale(5);
         this.floor.uniformSetScale(10);
 
     }
@@ -924,11 +926,15 @@ class Tank extends Apex
         
     }
 
-
     shoot(dir: SIMD2<number> = [0,1])
     {
-        var bullet = new Bullet(normalise2(dir), this.getPosition());
-        // bullet.uniformSetScale(this.tankBody.getScale()[0]);
+        const cannonLength = this.tankBody.getScaleX() * 0.16;
+        var dire: SIMD2<number> = normalise2([(Mouse.mousePos[0] - this.screenCoords[0]), (Mouse.mousePos[1] - this.screenCoords[1])]);
+        var bullet = new Bullet(dire,
+                    [this.getPositionX() + cannonLength * dire[0], 
+                    this.getPositionY() + this.tankBody.getScaleX() * 0.1, 
+                    this.getPositionZ() + cannonLength * dire[1]]);
+        bullet.uniformSetScale(this.tankBody.getScale()[0] * 0.007);
         this.addChld(bullet);
     }
 
@@ -960,12 +966,14 @@ class Bullet extends GameObject
     bouncesLeft: number = 1;
     direction: SIMD2<number>;
 
-    constructor(dir: SIMD2<number>, pos: SIMD3<number> = [0,0,0])
+    constructor(dir: SIMD2<number>, pos: SIMD3<number>)
     {
         super("bullet", ModelTypes.shell);
         this.setPosition(pos[0], pos[1], pos[2]);
         this.useBaseColourTexture(SpriteTypes.shell);
         this.direction = dir;
+        let bruh = Math.atan2(dir[1], dir[0]);
+        this.setRotationY(-(bruh - Math.PI / 2));
     }
 
     doUpdate(): void {
