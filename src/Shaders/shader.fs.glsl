@@ -9,5 +9,13 @@ uniform sampler2D uSampler;
 out vec4 fragColour;
 void main()
 {
-    fragColour = vec4(texture(uSampler, fragTexCoord).xyz * normalize(fragNormal),1);
+    vec4 baseColour = texture(uSampler, fragTexCoord);
+    vec4 diffuseColour = vec4(0.0, 0.0, 0.0, 1.0);
+
+    vec3 normalDir = normalize(fragNormal);
+    vec3 lightDir = normalize(vec3(0.0, 1.0, 1.0));
+    float diffuse = max(dot(normalDir, lightDir), 0.0);
+    diffuseColour += baseColour * diffuse;
+
+    fragColour = diffuseColour;
 }

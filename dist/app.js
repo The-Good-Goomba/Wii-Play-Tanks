@@ -10,21 +10,23 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 var _a;
 const { mat4, vec3, quat } = glMatrix;
+const normalise3 = (v) => {
+    const length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    return [v[0] / length, v[1] / length, v[2] / length];
+};
+const normalise2 = (v) => {
+    const length = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+    return [v[0] / length, v[1] / length];
+};
 var start = function () {
     Main.InitApp();
 };
 class Main {
-    static get mousePos() {
-        return this._mousePos;
-    }
-    static updateMousePos(event) {
-        Main._mousePos[0] = event.offsetX;
-        Main._mousePos[1] = event.offsetY;
-    }
     static InitApp() {
         Main.canvas = document.getElementById('game-surface');
         Main.gl = Main.canvas.getContext('webgl2');
-        Main.canvas.onmousemove = function (event) { Main.updateMousePos(event); };
+        Keyboard.Initialise();
+        Mouse.Initialise();
         if (!Main.gl) {
             alert('Your browser does not support WebGL');
         }
@@ -52,7 +54,37 @@ class Main {
         requestAnimationFrame(loop);
     }
 }
-Main._mousePos = [0, 0];
+class Keyboard {
+    static Initialise() {
+        window.addEventListener('keydown', function (event) {
+            Keyboard.keys[event.key] = true;
+        });
+        window.addEventListener('keyup', function (event) {
+            Keyboard.keys[event.key] = false;
+        });
+    }
+    static isKeyDown(key) {
+        return Keyboard.keys[key];
+    }
+}
+Keyboard.keys = {};
+class Mouse {
+    static get mousePos() {
+        return Mouse._mousePos;
+    }
+    static Initialise() {
+        window.onmousedown = function (event) { Mouse._mouseButtons[event.button] = true; };
+        window.onmouseup = function (event) { Mouse._mouseButtons[event.button] = false; };
+        Main.canvas.onmousemove = Mouse.updateMousePos;
+    }
+    ;
+    static updateMousePos(event) {
+        Mouse._mousePos[0] = event.offsetX;
+        Mouse._mousePos[1] = event.offsetY;
+    }
+}
+Mouse._mousePos = [0, 0];
+Mouse._mouseButtons = {};
 class SceneManager {
     static Initialise(type) {
         SceneManager.setScene(type);
@@ -276,6 +308,7 @@ class ModelLibrary {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             this.library[0 /* tank */] = yield ModelLoader.getBinaryFromObj("/src/Assets/tankP.obj");
             this.library[1 /* plane */] = yield ModelLoader.getBinaryFromObj("/src/Assets/plane.obj");
+            this.library[2 /* shell */] = yield ModelLoader.getBinaryFromObj("/src/Assets/shell.obj");
             resolve();
         }));
     }
@@ -373,7 +406,8 @@ class TextureLibrary {
             this.spriteLib[9 /* violetTank */] = { textureType: 0 /* bigSheet */, pos: [444, 1241], size: [32, 32] };
             this.spriteLib[10 /* whiteTank */] = { textureType: 0 /* bigSheet */, pos: [110, 1241], size: [32, 32] };
             this.spriteLib[11 /* yellowTank */] = { textureType: 0 /* bigSheet */, pos: [816, 1241], size: [32, 32] };
-            this.spriteLib[12 /* woodenFloor */] = { textureType: 0 /* bigSheet */, pos: [4, 4], size: [1024, 512] };
+            this.spriteLib[12 /* woodenFloor */] = { textureType: 0 /* bigSheet */, pos: [5, 522], size: [1024, 512] };
+            this.spriteLib[13 /* shell */] = { textureType: 0 /* bigSheet */, pos: [753, 1241], size: [32, 16] };
             for (var i in this.spriteLib) {
                 this.spriteLib[i].pos[0] /= this.getTexture(this.spriteLib[i].textureType).width;
                 this.spriteLib[i].pos[1] /= this.getTexture(this.spriteLib[i].textureType).height;
@@ -517,29 +551,92 @@ class BoundingBox {
 class TankScene extends Scene {
     buildScene() {
         this.tank1 = new Tank();
-        this.tank1.useBaseColourTexture(2 /* ashTank */);
+        this.tank1.tankBody.useBaseColourTexture(2 /* ashTank */);
         this.floor = new GameObject("Floor", 1 /* plane */);
         this.floor.useBaseColourTexture(12 /* woodenFloor */);
-        mat4.lookAt(this.viewMatrix, [0, 10, 15], [0, 0, 0], [0, 1, 0]);
-        mat4.perspective(this.projectionMatrix, Math.PI / 4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
+        mat4.lookAt(this.viewMatrix, [0, 10, 10], [0, 0, 0], normalise3([0, 5, -1]));
+        // mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
+        mat4.ortho(this.projectionMatrix, -10, 10, -7, 7, 0.1, 100.0);
         this.children[0] = this.tank1;
         this.children[1] = this.floor;
-        this.tank1.uniformSetScale(10);
+        this.tank1.tankBody.uniformSetScale(10);
         this.floor.uniformSetScale(10);
-        this.tank1.setPositionY(5);
     }
     doUpdate() {
+        if (Keyboard.isKeyDown('w')) {
+            this.tank1.moveUp();
+        }
+        if (Keyboard.isKeyDown('s')) {
+            this.tank1.moveDown();
+        }
+        if (Keyboard.isKeyDown('a')) {
+            this.tank1.moveLeft();
+        }
+        if (Keyboard.isKeyDown('d')) {
+            this.tank1.moveRight();
+        }
     }
 }
-class Tank extends GameObject {
+class Tank extends Apex {
     constructor() {
-        super("tank", 0 /* tank */);
+        super("Tank");
+        this.speed = 0.1;
+        this.rotationSpeed = 0.03;
+        this.baseRotation = 0;
+        this.screenCoords = [0, 0, 0];
+        this.tankBody = new GameObject("TankBody", 0 /* tank */);
+        mat4.fromRotation(this.tankBody.jointMatrices[0], Math.PI / 2, [0, 1, 0]);
+        this.addChld(this.tankBody);
+        this.tankBody.afterTranslation = () => {
+            var bruh1 = mat4.create();
+            mat4.mul(bruh1, this.projectionMatrix, this.viewMatrix);
+            vec3.transformMat4(this.screenCoords, this.tankBody.getPosition(), bruh1);
+            this.screenCoords[0] = ((this.screenCoords[0] + 1) / 2) * Main.canvas.width;
+            this.screenCoords[1] = -1 * ((this.screenCoords[1] - 1) / 2) * Main.canvas.height;
+        };
+        this.tankBody.afterTranslation();
     }
     doUpdate() {
         this.updateTurretRotation();
     }
+    shoot(dir = [0, 1]) {
+        var bullet = new Bullet(normalise2(dir), this.getPosition());
+        // bullet.uniformSetScale(this.tankBody.getScale()[0]);
+        this.addChld(bullet);
+    }
+    moveUp() {
+        this.tankBody.move(0, 0, -this.speed);
+    }
+    ;
+    moveDown() {
+        this.tankBody.move(0, 0, this.speed);
+    }
+    ;
+    moveLeft() {
+        this.tankBody.move(-this.speed, 0, 0);
+    }
+    ;
+    moveRight() {
+        this.tankBody.move(this.speed, 0, 0);
+    }
+    ;
     updateTurretRotation() {
-        var rot = Math.atan((Main.mousePos[1] - Main.canvas.width / 2) / (Main.mousePos[0] - Main.canvas.height / 2));
-        mat4.fromRotation(this.jointMatrices[1], rot, [0, 1, 0]);
+        var rot = Math.atan2((Mouse.mousePos[1] - this.screenCoords[1]), (Mouse.mousePos[0] - this.screenCoords[0]));
+        rot -= Math.PI / 2;
+        rot *= -1;
+        mat4.fromRotation(this.tankBody.jointMatrices[1], rot, [0, 1, 0]);
+    }
+}
+class Bullet extends GameObject {
+    constructor(dir, pos = [0, 0, 0]) {
+        super("bullet", 2 /* shell */);
+        this.speed = 0.1;
+        this.bouncesLeft = 1;
+        this.setPosition(pos[0], pos[1], pos[2]);
+        this.useBaseColourTexture(13 /* shell */);
+        this.direction = dir;
+    }
+    doUpdate() {
+        this.move(this.direction[0] * this.speed, 0, this.direction[1] * this.speed);
     }
 }

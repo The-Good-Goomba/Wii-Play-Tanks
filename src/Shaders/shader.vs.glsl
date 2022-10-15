@@ -25,7 +25,13 @@ uniform SpriteSheetInfo spriteInfo;
 
 void main() {
     int mm = int(meshMember);
+
+    mat3 normalMatrix = mat3(transpose(inverse(mModel)));
+    
+    vec4 norm = vec4(vertNormal, 1.0);
+    norm = jointMatrices[mm] * norm;
+
     fragTexCoord = vertTexCoord * spriteInfo.size + spriteInfo.pos;
-    fragNormal = vertNormal;
+    fragNormal = normalMatrix * norm.xyz;
     gl_Position = (mProj * mView * mModel * jointMatrices[mm] * vec4(vertPosition, 1.0));
 }

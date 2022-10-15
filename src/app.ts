@@ -9,6 +9,18 @@ type matrix4x4 = [number, number, number, number,
 type SIMD2<bruh> = [ bruh, bruh ];
 type SIMD3<bruh> = [ bruh, bruh, bruh ];
 
+const normalise3 = (v: SIMD3<number>): SIMD3<number> =>
+{
+    const length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    return [v[0] / length, v[1] / length, v[2] / length];
+}
+
+const normalise2 = (v: SIMD2<number>): SIMD2<number> =>
+{
+    const length = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+    return [v[0] / length, v[1] / length];
+}
+
 const enum TextureTypes
 {
     none = -1,
@@ -30,13 +42,15 @@ const enum SpriteTypes
     violetTank,
     whiteTank,
     yellowTank,
-    woodenFloor
+    woodenFloor,
+    shell
 }
 
 const enum ModelTypes
 {
     tank,
-    plane
+    plane,
+    shell
 }
 
 const enum VertexShaderTypes
@@ -64,16 +78,6 @@ class Main
 {
     static gl: WebGL2RenderingContext;
     static canvas: HTMLCanvasElement;
-    private static _mousePos: SIMD2<number> = [0, 0];
-
-    static get mousePos() {
-        return this._mousePos;
-    }
-
-    static updateMousePos(event: MouseEvent) {
-        Main._mousePos[0] = event.offsetX;
-        Main._mousePos[1] = event.offsetY;
-    }
 
     static InitApp() {
 
@@ -81,7 +85,8 @@ class Main
 
         Main.gl = Main.canvas.getContext('webgl2') as WebGL2RenderingContext;
 
-        Main.canvas.onmousemove = function(event) { Main.updateMousePos(event); }
+        Keyboard.Initialise();
+        Mouse.Initialise();
     
         if (!Main.gl) {
             alert('Your browser does not support WebGL');
@@ -120,6 +125,48 @@ class Main
     
     }
 
+}
+
+class Keyboard
+{
+    static keys: { [key: string]: boolean } = {};
+
+    static Initialise() {
+        window.addEventListener('keydown', function(event) {
+            Keyboard.keys[event.key] = true;
+        });
+        window.addEventListener('keyup', function(event) {
+            Keyboard.keys[event.key] = false;
+        });
+    }
+
+    static isKeyDown(key: string) {
+        return Keyboard.keys[key];
+    }
+}
+
+class Mouse 
+{
+    private static _mousePos: SIMD2<number> = [0, 0];
+
+    private static _mouseButtons: { [key: string]: boolean } = {};
+
+    static get mousePos() {
+        return Mouse._mousePos;
+    }
+
+    static Initialise() {
+
+        window.onmousedown = function(event) { Mouse._mouseButtons[event.button] = true; }
+        window.onmouseup = function(event) { Mouse._mouseButtons[event.button] = false; }
+
+        Main.canvas.onmousemove = Mouse.updateMousePos;
+    };
+
+    static updateMousePos(event: MouseEvent) {
+        Mouse._mousePos[0] = event.offsetX;
+        Mouse._mousePos[1] = event.offsetY;
+    }
 }
 
 class SceneManager
@@ -183,9 +230,9 @@ class Engine
 class Apex 
 {
 
-    private position = [0,0,0];
-    private rotation = [0,0,0];
-    private scale = [1,1,1];
+    private position: SIMD3<number> = [0,0,0];
+    private rotation: SIMD3<number> = [0,0,0];
+    private scale: SIMD3<number> = [1,1,1];
     private quaternion = [0,0,0,0];
 
     private name: string;
@@ -486,8 +533,9 @@ class ModelLibrary
     public Initialise()
     {
         return new Promise<void>(async (resolve, reject) => {
-            this.library[ModelTypes.tank] = await ModelLoader.getBinaryFromObj("/src/Assets/tankP.obj")
-            this.library[ModelTypes.plane] = await ModelLoader.getBinaryFromObj("/src/Assets/plane.obj")
+            this.library[ModelTypes.tank] = await ModelLoader.getBinaryFromObj("/src/Assets/tankP.obj");
+            this.library[ModelTypes.plane] = await ModelLoader.getBinaryFromObj("/src/Assets/plane.obj");
+            this.library[ModelTypes.shell] = await ModelLoader.getBinaryFromObj("/src/Assets/shell.obj");
             resolve();
         });   
     }
@@ -620,7 +668,8 @@ class TextureLibrary
             this.spriteLib[SpriteTypes.violetTank] = { textureType: TextureTypes.bigSheet, pos: [444,1241], size: [32,32]}
             this.spriteLib[SpriteTypes.whiteTank] = { textureType: TextureTypes.bigSheet, pos: [110,1241], size: [32,32]}
             this.spriteLib[SpriteTypes.yellowTank] = { textureType: TextureTypes.bigSheet, pos: [816,1241], size: [32,32]}
-            this.spriteLib[SpriteTypes.woodenFloor] = { textureType: TextureTypes.bigSheet, pos: [4,4], size: [1024,512]}
+            this.spriteLib[SpriteTypes.woodenFloor] = { textureType: TextureTypes.bigSheet, pos: [5,522], size: [1024,512]}
+            this.spriteLib[SpriteTypes.shell] = { textureType: TextureTypes.bigSheet, pos: [753,1241], size: [32,16]}
 
             for (var i in this.spriteLib)
             {
@@ -813,48 +862,114 @@ class TankScene extends Scene
     buildScene()
     {
         this.tank1 = new Tank();
-        this.tank1.useBaseColourTexture(SpriteTypes.ashTank);
+        this.tank1.tankBody.useBaseColourTexture(SpriteTypes.ashTank);
 
         this.floor = new GameObject("Floor", ModelTypes.plane);
         this.floor.useBaseColourTexture(SpriteTypes.woodenFloor);
 
-
-        mat4.lookAt(this.viewMatrix, [0, 10, 15], [0, 0, 0], [0, 1, 0]);
-        mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
+        mat4.lookAt(this.viewMatrix, [0, 10, 10], [0, 0, 0], normalise3([0,5,-1]));
+        // mat4.perspective(this.projectionMatrix, Math.PI/4.0, Main.canvas.width / Main.canvas.height, 0.1, 1000.0);
+        mat4.ortho(this.projectionMatrix, -10, 10, -7, 7, 0.1, 100.0);
 
         this.children[0] = this.tank1;
         this.children[1] = this.floor;
 
-        this.tank1.uniformSetScale(10);
+        this.tank1.tankBody.uniformSetScale(10);
         this.floor.uniformSetScale(10);
-        this.tank1.setPositionY(5);
 
     }
 
     doUpdate(): void {
+
+
+        if (Keyboard.isKeyDown('w')) { this.tank1.moveUp(); }
+        if (Keyboard.isKeyDown('s')) { this.tank1.moveDown(); }
+        if (Keyboard.isKeyDown('a')) { this.tank1.moveLeft(); }
+        if (Keyboard.isKeyDown('d')) { this.tank1.moveRight(); }
+
     }
 
 }
 
-class Tank extends GameObject
+class Tank extends Apex
 {
+    speed: number = 0.1;
+    rotationSpeed: number = 0.03;
+    baseRotation: number = 0;
+
+    tankBody!: GameObject;
+
+    screenCoords: SIMD3<number> = [0,0,0];
 
     constructor()
     {
-        super("tank", ModelTypes.tank);
+        super("Tank");
+        this.tankBody = new GameObject("TankBody", ModelTypes.tank);
+        mat4.fromRotation(this.tankBody.jointMatrices[0], Math.PI/2, [0,1,0]);
+        this.addChld(this.tankBody);
+
+        this.tankBody.afterTranslation = () => {
+            var bruh1: matrix4x4 = mat4.create();
+            mat4.mul(bruh1, this.projectionMatrix, this.viewMatrix);
+            vec3.transformMat4(this.screenCoords, this.tankBody.getPosition(), bruh1);
+            this.screenCoords[0] = ((this.screenCoords[0] + 1) / 2) * Main.canvas.width;
+            this.screenCoords[1] = -1 * ((this.screenCoords[1] - 1) / 2) * Main.canvas.height;
+        }
+
+        this.tankBody.afterTranslation();
     }
 
     doUpdate(): void {
         this.updateTurretRotation();
+        
     }
+
+
+    shoot(dir: SIMD2<number> = [0,1])
+    {
+        var bullet = new Bullet(normalise2(dir), this.getPosition());
+        // bullet.uniformSetScale(this.tankBody.getScale()[0]);
+        this.addChld(bullet);
+    }
+
+    moveUp() {
+        this.tankBody.move(0,0,-this.speed);
+    };
+    moveDown() {
+        this.tankBody.move(0,0,this.speed);
+    };
+    moveLeft() {
+        this.tankBody.move(-this.speed,0,0);
+    };
+    moveRight() {
+        this.tankBody.move(this.speed,0,0);
+    };
 
     updateTurretRotation()
     {
-        var rot = Math.atan((Main.mousePos[1] - Main.canvas.width / 2) / (Main.mousePos[0] - Main.canvas.height / 2));
-        mat4.fromRotation(this.jointMatrices[1], rot, [0,1,0]);
+        var rot = Math.atan2((Mouse.mousePos[1] - this.screenCoords[1]), (Mouse.mousePos[0] - this.screenCoords[0]));
+        rot -= Math.PI / 2;
+        rot *= -1;
+        mat4.fromRotation(this.tankBody.jointMatrices[1], rot, [0,1,0]);
+    }
+}
+
+class Bullet extends GameObject
+{
+    speed: number = 0.1;
+    bouncesLeft: number = 1;
+    direction: SIMD2<number>;
+
+    constructor(dir: SIMD2<number>, pos: SIMD3<number> = [0,0,0])
+    {
+        super("bullet", ModelTypes.shell);
+        this.setPosition(pos[0], pos[1], pos[2]);
+        this.useBaseColourTexture(SpriteTypes.shell);
+        this.direction = dir;
     }
 
-
-
-
+    doUpdate(): void {
+        this.move(this.direction[0] * this.speed, 0, this.direction[1] * this.speed);
+    }
+    
 }
